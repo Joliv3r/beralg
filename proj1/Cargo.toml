@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 feanor-math = "3.0.7"
 number-theory = "0.0.24"
+rand = "0.8.5"
