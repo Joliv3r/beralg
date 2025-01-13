@@ -88,3 +88,37 @@ impl MultiplicativeGroup {
         }
     }
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::algebraic_structure::Element;
+
+    #[test]
+    fn test_algebraic_structure_arithmetic() {
+        let f: FiniteField = FiniteField::new(17).unwrap();
+        let a = Element::new(f, 234);
+        let b = Element::new(f, 23);
+
+        assert_eq!(a.representation, 234%17);
+        assert_eq!(b.representation, 6);
+
+        let added = (a + b).representation;
+        let multiplied = (a * b).representation;
+
+        assert_eq!(added, (234+23)%17);
+        assert_eq!(multiplied, (234*23)%17);
+
+        let g: MultiplicativeGroup = MultiplicativeGroup::from_finite_field(&f);
+        let a = Element::new(g, 72);
+        let b = Element::new(g, 186);
+
+        assert_eq!(a.representation, 4);
+        assert_eq!(b.representation, 16);
+
+        let multiplied = (a * b).representation;
+        assert_eq!(multiplied, 13);
+    }
+}
