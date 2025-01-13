@@ -1,0 +1,8 @@
+[package]
+name = "proj1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+feanor-math = "3.0.7"
+number-theory = "0.0.24"
