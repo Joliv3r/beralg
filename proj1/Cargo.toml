@@ -7,3 +7,6 @@ edition = "2021"
 feanor-math = "3.0.7"
 number-theory = "0.0.24"
 rand = "0.8.5"
+
+[patch.crates-io]
+number-theory = { path = "/home/joliver/rust/ENT/" }

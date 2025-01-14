@@ -68,8 +68,6 @@ checksum = "f62ebabb004f1a0d8cb02e21ed2456828d4a65b44b0f0b7de29847cee5d7c3a3"
 [[package]]
 name = "number-theory"
 version = "0.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6385dec3acbd7b01418b110c7df8c0bf077d254e075a0dcebb87d49b38bf4776"
 dependencies = [
  "machine-prime",
 ]

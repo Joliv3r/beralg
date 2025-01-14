@@ -1,72 +1,95 @@
 // This is in addition to computational algebra a personal learning experience with rust.
 
 use std::ops;
+use number_theory::Mpz;
+use std::sync::Arc;
 pub mod finite_field;
 
 
 pub trait HasRepresentation {
-    fn make_representation(&self, repr: u32) -> u32;
+    fn make_representation(&self, repr: Mpz) -> Mpz;
 }
 
 
-#[derive(Debug, Clone, Copy)]
-pub struct Element<T: HasRepresentation + Copy> {
-    outer_structure: T,
-    representation: u32,
+#[derive(Debug, Clone)]
+pub struct Element<T: HasRepresentation + Clone> {
+    outer_structure: Arc<T>,
+    representation: Mpz,
 }
 
 
-pub trait HasMul<T: HasRepresentation + Copy = Self> {
-    fn mul(&self, a: Element<T>, b: Element<T>) -> Element<T>;
+pub trait HasMul<T: HasRepresentation + Clone = Self> {
+    fn mul(&self, a: &Element<T>, b: &Element<T>) -> Element<T>;
 }
 
 
-pub trait HasAdd<T: HasRepresentation + Copy = Self> {
-    fn add(&self, a: Element<T>, b: Element<T>) -> Element<T>;
+pub trait HasAdd<T: HasRepresentation + Clone = Self> {
+    fn add(&self, a: &Element<T>, b: &Element<T>) -> Element<T>;
 }
 
 
-pub trait HasMulInv<T: HasRepresentation + HasMul + Copy = Self> {
-    fn inv(&self, a: Element<T>) -> Element<T>;
+pub trait HasMulInv<T: HasRepresentation + HasMul + Clone = Self> {
+    fn inv(&self, a: &Element<T>) -> Element<T>;
 }
 
 
-impl<T: HasRepresentation + Copy> Element<T> {
-    pub fn new(outer_structure: T, repr: u32) -> Element<T> {
-        let representation: u32 = outer_structure.make_representation(repr);
+impl<T: HasRepresentation + Clone> Element<T> {
+    pub fn new(outer_structure: Arc<T>, repr: Mpz) -> Element<T> {
+        let representation: Mpz = outer_structure.make_representation(repr);
         Element { outer_structure, representation }
     }
-}
 
 
-impl<T: HasMul + HasRepresentation + Copy> ops::Mul<Element<T>> for Element<T> {
-    type Output = Element<T>;
+    pub fn get_outer_structure(&self) -> Arc<T> {
+        self.outer_structure.clone()
+    }
 
-    fn mul(self, _rhs: Element<T>) -> Element<T> {
-        self.outer_structure.mul(self, _rhs)
+
+    pub fn get_rep(&self) -> &Mpz {
+        &self.representation
     }
 }
 
 
-impl<T: HasMul + HasRepresentation + Copy> Element<T> {
-    pub fn pow(a: i32) -> Element<T> {
-        todo!()
+impl<T: HasMul + HasRepresentation + Clone> Element<T> {
+    fn mul_ref(&self, _rhs: &Element<T>) -> Element<T> {
+        self.outer_structure.mul(&self, _rhs)
     }
 }
 
 
-impl<T: HasAdd + HasRepresentation + Copy> ops::Add<Element<T>> for Element<T> {
+impl<T: HasMul + HasRepresentation + Clone> Element<T> {
+    pub fn pow(&self, mut a: Mpz) -> Element<T> {
+        let mut base = self.clone();
+        let mut product = Element::new(self.get_outer_structure(), Mpz::one());
+        let mut exponent = a.clone();
+
+        loop {
+            if a.check_bit(0) {
+                product = product.mul_ref(&base);
+            }
+            if a.is_zero() {
+                break;
+            }
+            base = base.mul_ref(&base);
+            a.mut_shr(1);
+        }
+
+        product
+    }
+}
+
+
+impl<T: HasAdd + HasRepresentation + Clone> Element<T> {
     // Addition implemented even in structures without addition.
-    type Output = Element<T>;
-
-    fn add(self, _rhs: Element<T>) -> Element<T> {
-        self.outer_structure.add(self, _rhs)
+    fn add_ref(&self, _rhs: &Element<T>) -> Element<T> {
+        self.outer_structure.add(&self, _rhs)
     }
 }
 
 
-impl<T: HasMulInv + HasMul + HasRepresentation + Copy> Element<T> {
-    fn inv(self) -> Element<T> {
-        self.outer_structure.inv(self)
+impl<T: HasMulInv + HasMul + HasRepresentation + Clone> Element<T> {
+    fn inv(&self) -> Element<T> {
+        self.outer_structure.inv(&self)
     }
 }
