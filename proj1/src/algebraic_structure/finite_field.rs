@@ -1,10 +1,8 @@
 // This module uses a lot of cloning of structures, which can be avoided by elements having
 // reference to outer structure.
 
-
 use crate::algebraic_structure::{HasMul, HasAdd, HasRepresentation, Element};
-use rug::{integer::IsPrime, Assign, Complete, Integer};
-use std::sync::Arc;
+use rug::{integer::IsPrime, Complete, Integer};
 
 
 use super::HasMulInv;
@@ -18,7 +16,7 @@ pub struct FiniteField {
 
 impl HasRepresentation for FiniteField {
     fn make_representation(&self, repr: Integer) -> Integer {
-        repr % self.mod_num()
+        repr.modulo(self.mod_num())
     }
 }
 
@@ -27,8 +25,7 @@ impl HasMul for FiniteField {
     fn mul(&self, a: &Element<FiniteField>, b: &Element<FiniteField>) -> Element<FiniteField> {
         Element::new(
             a.get_outer_structure(),
-            a.representation.product_residue(&b.representation, self.mod_num())
-            a
+            (a.get_rep() * b.get_rep()).complete() % self.mod_num()
         )
     }
 }
@@ -38,7 +35,7 @@ impl HasAdd for FiniteField {
     fn add(&self, a: &Element<FiniteField>, b: &Element<FiniteField>) -> Element<FiniteField> {
         Element::new(
             a.get_outer_structure().clone(),
-            (a.representation.ref_addition(&b.representation)).residue(self.mod_num())
+            (a.get_rep() + b.get_rep()).complete() % self.mod_num()
         )
     }
 }
@@ -46,7 +43,7 @@ impl HasAdd for FiniteField {
 
 impl FiniteField {
     pub fn new(size: Integer) -> Option<FiniteField> {
-        if size.is_probably_prime(30) == IsPrime::Yes {
+        if size.is_probably_prime(30) != IsPrime::No {
             Some(FiniteField {
                 size,
             })
@@ -70,7 +67,7 @@ impl FiniteField {
         let mut b1: Integer = b.clone();
 
         if b.is_zero() {
-            return (a1.clone(), Integer::ONE.clone(), Integer::ZERO.clone())
+            return (a1, Integer::ONE.clone(), Integer::ZERO.clone())
         };
 
         let mut x: Integer = Integer::ZERO.clone();
@@ -99,10 +96,7 @@ impl FiniteField {
             y1 = y;
         };
 
-        x = x2;
-        y = y2;
-
-        (a1, x, y)
+        (a1, x2, y2)
     }
 
 
@@ -139,12 +133,11 @@ impl FiniteField {
 
 impl HasMulInv for FiniteField {
     fn inv(&self, a: &Element<Self>) -> Element<Self> {
-        let p = &Element::new(
+        let (_, _, y) = self.extended_euclidean_ordered(self.mod_num(), a.get_rep());
+        Element::new(
             a.get_outer_structure(),
-            self.mod_num().clone(),
-        );
-        let (_, x, _) = self.extended_euclidean(a, p);
-        x 
+            y
+        )
     }
 }
 
@@ -157,7 +150,7 @@ pub struct MultiplicativeGroup {
 
 impl HasRepresentation for MultiplicativeGroup {
     fn make_representation(&self, repr: Integer) -> Integer {
-        repr % self.mod_num()
+        repr.modulo(self.mod_num())
     }
 }
 
@@ -204,95 +197,96 @@ impl MultiplicativeGroup {
 mod tests {
     use super::*;
     use crate::algebraic_structure::Element;
-    use rand::{self, RngCore};
-    use rug::rand::MutRandState;
+    use rug::rand::RandState;
+    use std::sync::Arc;
 
     #[test]
     fn test_algebraic_structure_arithmetic() {
         let n: u32 = 200;
-        let rand_len = 12;
-        let mut p: Integer = Integer::from(2);
-        let mut rng: dyn &MutRandState = MutRandState::new();
+        let mut prime: Integer = Integer::from(2);
+        let mut rng = RandState::new();
 
         for _ in 2..n {
+            let p = prime.clone();
             let f: Arc<FiniteField> = Arc::new(FiniteField::new(p.clone()).unwrap());
-            let a_rand: Integer = Integer::random_below(p, rng);
-            let b_rand: Mpz = Mpz::rand(rand_len);
+            let a_rand: Integer = Integer::from(rng.bits(32));
+            let b_rand: Integer = Integer::from(rng.bits(32));
             let a = Element::new(f.clone(), a_rand.clone());
             let b = Element::new(f.clone(), b_rand.clone());
 
-            assert_eq!(a.get_rep(), &a_rand.residue(p));
-            assert_eq!(b.get_rep(), &b_rand.residue(p));
+            assert_eq!(a.get_rep(), &(&a_rand % &p).complete());
+            assert_eq!(b.get_rep(), &(&b_rand % &p).complete());
 
             let added = (a.add_ref(&b)).get_rep().clone();
             let multiplied = (a.mul_ref(&b)).get_rep().clone();
 
-            let added_check: Mpz = a_rand.residue(p).ref_addition(&b_rand.residue(p)).residue(p);
-            let mul_check: Mpz = a_rand.residue(p).ref_product(&b_rand.residue(p)).residue(p);
+            let added_check: Integer = ((&a_rand % &p).complete() + (&b_rand % &p).complete()) % &p;
+            let mul_check: Integer = ((a_rand % &p) * (b_rand % &p)) % &p;
 
             assert_eq!(added, added_check, "Failed for: {} + {}, and got {} instead of {}", a.get_rep(), b.get_rep(), added, added_check);
             assert_eq!(multiplied, mul_check, "Failed for: {} * {}, and got {} instead of {}", a.get_rep(), b.get_rep(), multiplied, mul_check);
 
             let g: Arc<MultiplicativeGroup> = Arc::new(MultiplicativeGroup::from_finite_field(&f));
-            let a_rand: Mpz = Mpz::rand(rand_len);
-            let b_rand: Mpz = Mpz::rand(rand_len);
+            let a_rand: Integer = Integer::from(rng.bits(32));
+            let b_rand: Integer = Integer::from(rng.bits(32));
             let a = Element::new(g.clone(), a_rand.clone());
             let b = Element::new(g.clone(), b_rand.clone());
 
-            assert_eq!(a.get_rep(), &a_rand.residue(p), "Failed representation of {} in Z_{},  got {} instead of {}", a_rand, p, a.get_rep(), a_rand.residue(p));
-            assert_eq!(b.get_rep(), &b_rand.residue(p), "Failed representation of {} in Z_{},  got {} instead of {}", b_rand, p, b.get_rep(), b_rand.residue(p));
+            assert_eq!(a.get_rep(), &(&a_rand % &p).complete(), "Failed representation of {} in Z_{},  got {} instead of {}", &a_rand, &p, a.get_rep(), (&a_rand % &p).complete());
+            assert_eq!(b.get_rep(), &(&b_rand % &p).complete(), "Failed representation of {} in Z_{},  got {} instead of {}", &b_rand, &p, b.get_rep(), (&b_rand % &p).complete());
 
             let multiplied = (a.mul_ref(&b)).representation;
-            let mul_check: Mpz = a_rand.residue(p).ref_product(&b_rand.residue(p)).residue(p);
+            let mul_check: Integer = ((a_rand % &p) * (b_rand % &p)) % &p;
             assert_eq!(multiplied, mul_check);
 
-            p.next_prime_mut();
-            }
+            prime.next_prime_mut();
         }
     }
-
 
     #[test]
     fn test_extended_euclidean() {
         let n: u32 = 200;
-        let rand_len = 12;
+        let mut prime: Integer = Integer::from(2);
+        let mut rng = RandState::new();
 
-        for i in 2..n {
-            if i.is_prime() {
-                let p = Mpz::from_u64(i as u64);
-                let f = Arc::new(FiniteField::new(p.clone()).unwrap());
-                let mut a_rand = Mpz::rand(rand_len);
-                let mut a = Element::new(f.clone(), a_rand);
-                // while a_rand.residue(&p).u_cmp(&Mpz::zero()).is_ne()  {
-                //     a_rand = Mpz::rand(rand_len);
-                //     a = Element::new(f.clone(), a_rand);
-                // }
+        for _ in 2..n {
+            let p = prime.clone();
+            let f = Arc::new(FiniteField::new(p.clone()).unwrap());
+            let a_rand = (Integer::from(rng.bits(32)).modulo(&(&p-&Integer::ONE.clone()).complete())) + 1 ;
+            let a = Element::new(f.clone(), a_rand);
 
-                let a_inv = a.inv();
-                assert_eq!(&Mpz::one(), a_inv.get_rep(), "We have a: {}, a_inv: {}, p: {}", a.representation, a_inv.representation, p);
+            let a_inv = a.inv();
+            assert_eq!(Integer::ONE, a_inv.mul_ref(&a).get_rep(), "We have a: {}, a_inv: {}, p: {}", a.get_rep(), a_inv.get_rep(), p);
 
-            }
+            prime.next_prime_mut();
+
         }
     }
 
 
     #[test]
     fn test_exponentiation() {
-        let p: Mpz = Mpz::from_u64(10).pow(10).ref_addition(&Mpz::from_u64(19));
-        let rand_len = 500;
-        let f = Arc::new(FiniteField::new(p.clone()).unwrap());
+        let n: u32 = 200;
+        let mut rng = RandState::new();
+        let mut prime: Integer = Integer::from(2);
 
-        let a_rand = Mpz::rand(rand_len);
-        // let a_rand = Mpz::from_u64(4);
-        let a = Element::new(f.clone(), a_rand.clone());
 
-        let mut x_rand = Mpz::rand(rand_len);
-        // let x_rand = Mpz::from_u64(2);
-        // let x = Element::new(f.clone(), x_rand.clone());
+        for _ in 2..n {
+            let p = prime.clone();
+            let f = Arc::new(FiniteField::new(p.clone()).unwrap());
 
-        let a_exp_check = a_rand.exp_residue(&x_rand, &p);
-        let a_exp = a.pow(x_rand);
+            let a_rand = Integer::from(rng.bits(32));
+            let a = Element::new(f.clone(), a_rand.clone());
 
-        assert_eq!(a_exp.get_rep(), &a_exp_check);
+            let x_rand = Integer::from(rng.bits(32));
+
+            // let a_exp_check = a_rand.exp_residue(&x_rand, &p);
+            let a_exp_check = a_rand.pow_mod_ref(&x_rand, &p).unwrap().complete();
+            let a_exp = a.pow(x_rand);
+
+            assert_eq!(a_exp.get_rep(), &a_exp_check);
+
+            prime.next_prime_mut();
+        }
     }
 }

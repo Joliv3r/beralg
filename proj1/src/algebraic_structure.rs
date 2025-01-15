@@ -60,17 +60,15 @@ impl<T: HasMul + HasRepresentation + Clone> Element<T> {
 
 impl<T: HasMul + HasRepresentation + Clone> Element<T> {
     pub fn pow(&self, mut a: Integer) -> Element<T> {
-        let mut base = self.clone();
         let mut product = Element::new(self.get_outer_structure(), Integer::ONE.clone());
+        let mut base = self.clone();
 
-        loop {
+        while !a.is_zero() {
             if a.get_bit(0) {
                 product = product.mul_ref(&base);
             }
-            if a.is_zero() {
-                break;
-            }
             base = base.mul_ref(&base);
+
             a = a >> 1;
         }
 
