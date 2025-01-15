@@ -3,7 +3,7 @@
 
 
 use crate::algebraic_structure::{HasMul, HasAdd, HasRepresentation, Element};
-use number_theory::{NumberTheory, Mpz};
+use rug::{integer::IsPrime, Assign, Complete, Integer};
 use std::sync::Arc;
 
 
@@ -12,13 +12,13 @@ use super::HasMulInv;
 #[derive(Debug, Clone)]
 pub struct FiniteField {
     // This struct will only consider finite fields isomorphic to Z_p for p prime.
-    size: Mpz,
+    size: Integer,
 }
 
 
 impl HasRepresentation for FiniteField {
-    fn make_representation(&self, repr: Mpz) -> Mpz {
-        repr.residue(self.mod_num())
+    fn make_representation(&self, repr: Integer) -> Integer {
+        repr % self.mod_num()
     }
 }
 
@@ -28,6 +28,7 @@ impl HasMul for FiniteField {
         Element::new(
             a.get_outer_structure(),
             a.representation.product_residue(&b.representation, self.mod_num())
+            a
         )
     }
 }
@@ -44,8 +45,8 @@ impl HasAdd for FiniteField {
 
 
 impl FiniteField {
-    pub fn new(size: Mpz) -> Option<FiniteField> {
-        if size.is_prime() {
+    pub fn new(size: Integer) -> Option<FiniteField> {
+        if size.is_probably_prime(30) == IsPrime::Yes {
             Some(FiniteField {
                 size,
             })
@@ -54,44 +55,42 @@ impl FiniteField {
         }
     }
 
-    pub fn get_size(&self) -> Mpz {
+    pub fn get_size(&self) -> Integer {
         self.size.clone()
     }
 
-    fn mod_num(&self) -> &Mpz {
+    fn mod_num(&self) -> &Integer {
         &self.size
     }
 
-    fn extended_euclidean_ordered(&self, a: &Mpz, b: &Mpz) -> (Mpz, Mpz, Mpz) {
+    fn extended_euclidean_ordered(&self, a: &Integer, b: &Integer) -> (Integer, Integer, Integer) {
         // There have been no attempt to optimize this function using cloning and references
         // efficiently.
-        let mut a1: Mpz = a.clone();
-        let mut b1: Mpz = b.clone();
+        let mut a1: Integer = a.clone();
+        let mut b1: Integer = b.clone();
 
-        if b == &Mpz::from_u64(0) {
-            return (a1.clone(), Mpz::one(), Mpz::zero())
+        if b.is_zero() {
+            return (a1.clone(), Integer::ONE.clone(), Integer::ZERO.clone())
         };
 
-        let mut x: Mpz = Mpz::zero();
-        let mut y: Mpz = Mpz::zero();
+        let mut x: Integer = Integer::ZERO.clone();
+        let mut y: Integer = Integer::ZERO.clone();
         
-        let mut x2: Mpz = Mpz::one();
-        let mut x1: Mpz = Mpz::zero();
-        let mut y2: Mpz = Mpz::zero();
-        let mut y1: Mpz = Mpz::one();
+        let mut x2: Integer = Integer::ONE.clone();
+        let mut x1: Integer = Integer::ZERO.clone();
+        let mut y2: Integer = Integer::ZERO.clone();
+        let mut y1: Integer = Integer::ONE.clone();
 
-        let mut q: Mpz = Mpz::zero();
-        let mut r: Mpz = Mpz::zero();
+        let mut q: Integer = Integer::ZERO.clone();
+        let mut r: Integer = Integer::ZERO.clone();
 
-        while b.u_cmp(&Mpz::zero()).is_gt() {
+
+        while b1 > Integer::ZERO {
             // q = a1/b1;
-            (q, _) = a1.euclidean_div(&b1);
-            // r = a1 - q*b1
-            r = Mpz::ref_subtraction(&a1, &Mpz::ref_product(&q, &b1));
-            // x = x2 - q*x1;
-            x = Mpz::ref_subtraction(&x2, &Mpz::ref_product(&q, &x1));
-            // y = y2 - q*y1;
-            y = Mpz::ref_subtraction(&y2, &Mpz::ref_product(&q, &y1));
+            (q, _) = (a1.div_rem_floor_ref(&b1)).complete();
+            r = a1 - &q*&b1;
+            x = x2 - &q*&x1;
+            y = y2 - &q*&y1;
             a1 = b1;
             b1 = r;
             x2 = x1;
@@ -107,10 +106,10 @@ impl FiniteField {
     }
 
 
-    fn extended_euclidean_to_integers(&self, a: &Element<FiniteField>, b: &Element<FiniteField>) -> (Mpz, Mpz, Mpz) {
-        let a_rep: &Mpz = a.get_rep();
-        let b_rep: &Mpz = b.get_rep();
-        if a_rep.u_cmp(b_rep).is_gt() {
+    fn extended_euclidean_to_integers(&self, a: &Element<FiniteField>, b: &Element<FiniteField>) -> (Integer, Integer, Integer) {
+        let a_rep: &Integer = a.get_rep();
+        let b_rep: &Integer = b.get_rep();
+        if a_rep > b_rep {
             self.extended_euclidean_ordered(a_rep, b_rep)
         } else {
             self.extended_euclidean_ordered(b_rep, a_rep)
@@ -152,13 +151,13 @@ impl HasMulInv for FiniteField {
 
 #[derive(Debug, Clone)]
 pub struct MultiplicativeGroup {
-    mod_num: Mpz,
+    mod_num: Integer,
 }
 
 
 impl HasRepresentation for MultiplicativeGroup {
-    fn make_representation(&self, repr: Mpz) -> Mpz {
-        repr.residue(self.mod_num())
+    fn make_representation(&self, repr: Integer) -> Integer {
+        repr % self.mod_num()
     }
 }
 
@@ -167,14 +166,14 @@ impl HasMul for MultiplicativeGroup {
     fn mul(&self, a: &Element<MultiplicativeGroup>, b: &Element<MultiplicativeGroup>) -> Element<MultiplicativeGroup> {
         Element::new(
             a.get_outer_structure(),
-            a.representation.ref_product(&b.representation).residue(self.mod_num())
+            (a.get_rep() * b.get_rep()).complete() % self.mod_num()
         )
     }
 }
 
 
 impl MultiplicativeGroup {
-    pub fn new(mod_num: Mpz) -> MultiplicativeGroup {
+    pub fn new(mod_num: Integer) -> MultiplicativeGroup {
         MultiplicativeGroup {
             mod_num,
         }
@@ -189,13 +188,13 @@ impl MultiplicativeGroup {
     }
 
 
-    pub fn mod_num(&self) -> &Mpz {
+    pub fn mod_num(&self) -> &Integer {
         &self.mod_num
     }
 
 
-    pub fn get_size(&self) -> Mpz {
-        self.mod_num.ref_addition(&Mpz::one())
+    pub fn get_size(&self) -> Integer {
+        (self.mod_num() + Integer::ONE).complete()
     }
 }
 
@@ -206,45 +205,48 @@ mod tests {
     use super::*;
     use crate::algebraic_structure::Element;
     use rand::{self, RngCore};
+    use rug::rand::MutRandState;
 
     #[test]
     fn test_algebraic_structure_arithmetic() {
         let n: u32 = 200;
         let rand_len = 12;
+        let mut p: Integer = Integer::from(2);
+        let mut rng: dyn &MutRandState = MutRandState::new();
 
-        for i in 2..n {
-            if i.is_prime() {
-                let p = &Mpz::from_u64(i as u64);
-                let f: Arc<FiniteField> = Arc::new(FiniteField::new(p.clone()).unwrap());
-                let a_rand: Mpz = Mpz::rand(rand_len);
-                let b_rand: Mpz = Mpz::rand(rand_len);
-                let a = Element::new(f.clone(), a_rand.clone());
-                let b = Element::new(f.clone(), b_rand.clone());
+        for _ in 2..n {
+            let f: Arc<FiniteField> = Arc::new(FiniteField::new(p.clone()).unwrap());
+            let a_rand: Integer = Integer::random_below(p, rng);
+            let b_rand: Mpz = Mpz::rand(rand_len);
+            let a = Element::new(f.clone(), a_rand.clone());
+            let b = Element::new(f.clone(), b_rand.clone());
 
-                assert_eq!(a.get_rep(), &a_rand.residue(p));
-                assert_eq!(b.get_rep(), &b_rand.residue(p));
+            assert_eq!(a.get_rep(), &a_rand.residue(p));
+            assert_eq!(b.get_rep(), &b_rand.residue(p));
 
-                let added = (a.add_ref(&b)).get_rep().clone();
-                let multiplied = (a.mul_ref(&b)).get_rep().clone();
+            let added = (a.add_ref(&b)).get_rep().clone();
+            let multiplied = (a.mul_ref(&b)).get_rep().clone();
 
-                let added_check: Mpz = a_rand.residue(p).ref_addition(&b_rand.residue(p)).residue(p);
-                let mul_check: Mpz = a_rand.residue(p).ref_product(&b_rand.residue(p)).residue(p);
+            let added_check: Mpz = a_rand.residue(p).ref_addition(&b_rand.residue(p)).residue(p);
+            let mul_check: Mpz = a_rand.residue(p).ref_product(&b_rand.residue(p)).residue(p);
 
-                assert_eq!(added, added_check, "Failed for: {} + {}, and got {} instead of {}", a.get_rep(), b.get_rep(), added, added_check);
-                assert_eq!(multiplied, mul_check, "Failed for: {} * {}, and got {} instead of {}", a.get_rep(), b.get_rep(), multiplied, mul_check);
+            assert_eq!(added, added_check, "Failed for: {} + {}, and got {} instead of {}", a.get_rep(), b.get_rep(), added, added_check);
+            assert_eq!(multiplied, mul_check, "Failed for: {} * {}, and got {} instead of {}", a.get_rep(), b.get_rep(), multiplied, mul_check);
 
-                let g: Arc<MultiplicativeGroup> = Arc::new(MultiplicativeGroup::from_finite_field(&f));
-                let a_rand: Mpz = Mpz::rand(rand_len);
-                let b_rand: Mpz = Mpz::rand(rand_len);
-                let a = Element::new(g.clone(), a_rand.clone());
-                let b = Element::new(g.clone(), b_rand.clone());
+            let g: Arc<MultiplicativeGroup> = Arc::new(MultiplicativeGroup::from_finite_field(&f));
+            let a_rand: Mpz = Mpz::rand(rand_len);
+            let b_rand: Mpz = Mpz::rand(rand_len);
+            let a = Element::new(g.clone(), a_rand.clone());
+            let b = Element::new(g.clone(), b_rand.clone());
 
-                assert_eq!(a.get_rep(), &a_rand.residue(p), "Failed representation of {} in Z_{},  got {} instead of {}", a_rand, p, a.get_rep(), a_rand.residue(p));
-                assert_eq!(b.get_rep(), &b_rand.residue(p), "Failed representation of {} in Z_{},  got {} instead of {}", b_rand, p, b.get_rep(), b_rand.residue(p));
+            assert_eq!(a.get_rep(), &a_rand.residue(p), "Failed representation of {} in Z_{},  got {} instead of {}", a_rand, p, a.get_rep(), a_rand.residue(p));
+            assert_eq!(b.get_rep(), &b_rand.residue(p), "Failed representation of {} in Z_{},  got {} instead of {}", b_rand, p, b.get_rep(), b_rand.residue(p));
 
-                let multiplied = (a.mul_ref(&b)).representation;
-                let mul_check: Mpz = a_rand.residue(p).ref_product(&b_rand.residue(p)).residue(p);
-                assert_eq!(multiplied, mul_check);
+            let multiplied = (a.mul_ref(&b)).representation;
+            let mul_check: Mpz = a_rand.residue(p).ref_product(&b_rand.residue(p)).residue(p);
+            assert_eq!(multiplied, mul_check);
+
+            p.next_prime_mut();
             }
         }
     }
