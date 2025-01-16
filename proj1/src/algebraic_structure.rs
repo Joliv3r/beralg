@@ -1,11 +1,8 @@
 // This is in addition to computational algebra a personal learning experience with rust.
 
-use std::ops;
 use rug::Integer;
 use std::sync::Arc;
 pub mod finite_field;
-
-
 
 
 pub trait HasRepresentation {
@@ -55,7 +52,7 @@ impl<T: HasRepresentation + Clone> Element<T> {
 
 
 impl<T: HasMul + HasRepresentation + Clone> Element<T> {
-    fn mul_ref(&self, _rhs: &Element<T>) -> Element<T> {
+    pub fn mul_ref(&self, _rhs: &Element<T>) -> Element<T> {
         self.outer_structure.mul(&self, _rhs)
     }
 }
@@ -63,34 +60,20 @@ impl<T: HasMul + HasRepresentation + Clone> Element<T> {
 
 impl<T: HasMul + HasRepresentation + Clone> Element<T> {
     pub fn pow(&self, a: &Integer) -> Element<T> {
-        // let mut product = Element::new(self.get_outer_structure(), Integer::ONE.clone());
-        // let mut base = self.clone();
-        //
-        // while !a.is_zero() {
-        //     if a.get_bit(0) {
-        //         product = product.mul_ref(&base);
-        //     }
-        //     base = base.mul_ref(&base);
-        //
-        //     a = a >> 1;
-        // }
-        //
-        // product
-
         self.get_outer_structure().pow(self, a)
     }
 }
 
 
 impl<T: HasAdd + HasRepresentation + Clone> Element<T> {
-    fn add_ref(&self, _rhs: &Element<T>) -> Element<T> {
+    pub fn add_ref(&self, _rhs: &Element<T>) -> Element<T> {
         self.outer_structure.add(&self, _rhs)
     }
 }
 
 
 impl<T: HasMulInv + HasMul + HasRepresentation + Clone> Element<T> {
-    fn inv(&self) -> Element<T> {
+    pub fn inv(&self) -> Element<T> {
         self.outer_structure.inv(&self)
     }
 }
