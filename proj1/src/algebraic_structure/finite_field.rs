@@ -1,7 +1,7 @@
 // This module uses a lot of cloning of structures, which can be avoided by elements having
 // reference to outer structure.
 
-use crate::algebraic_structure::{HasMul, HasAdd, HasRepresentation, Element};
+use crate::algebraic_structure::{Element, HasAdd, HasMul, HasRepresentation};
 use rug::{integer::IsPrime, Complete, Integer};
 
 
@@ -26,6 +26,13 @@ impl HasMul for FiniteField {
         Element::new(
             a.get_outer_structure(),
             (a.get_rep() * b.get_rep()).complete() % self.mod_num()
+        )
+    }
+
+    fn pow(&self, a: &Element<Self>, b: &Integer) -> Element<Self> {
+        Element::new(
+            a.get_outer_structure(),
+            pow_rug(a.get_rep(), b, self.mod_num())
         )
     }
 }
@@ -162,6 +169,13 @@ impl HasMul for MultiplicativeGroup {
             (a.get_rep() * b.get_rep()).complete() % self.mod_num()
         )
     }
+
+    fn pow(&self, a: &Element<Self>, b: &Integer) -> Element<Self> {
+        Element::new(
+            a.get_outer_structure(),
+            pow_rug(a.get_rep(), b, self.mod_num()),
+        )
+    }
 }
 
 
@@ -191,6 +205,21 @@ impl MultiplicativeGroup {
     }
 }
 
+
+pub fn pow_rug(a: &Integer, b: &Integer, n: &Integer) -> Integer {
+    let mut product: Integer = Integer::ONE.clone();
+    let mut base = a.clone() % n;
+    let mut exponent = b.clone();
+
+    while exponent != 0 {
+        if exponent.get_bit(0) {
+            product = (product * &base).modulo(n);
+        }
+        base = base.square().modulo(n);
+        exponent = exponent >> 1;
+    }
+    product
+}
 
 
 #[cfg(test)]
@@ -282,7 +311,7 @@ mod tests {
 
             // let a_exp_check = a_rand.exp_residue(&x_rand, &p);
             let a_exp_check = a_rand.pow_mod_ref(&x_rand, &p).unwrap().complete();
-            let a_exp = a.pow(x_rand);
+            let a_exp = a.pow(&x_rand);
 
             assert_eq!(a_exp.get_rep(), &a_exp_check);
 

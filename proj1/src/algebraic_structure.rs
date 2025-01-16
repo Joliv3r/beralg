@@ -6,6 +6,8 @@ use std::sync::Arc;
 pub mod finite_field;
 
 
+
+
 pub trait HasRepresentation {
     fn make_representation(&self, repr: Integer) -> Integer;
 }
@@ -20,6 +22,7 @@ pub struct Element<T: HasRepresentation + Clone> {
 
 pub trait HasMul<T: HasRepresentation + Clone = Self> {
     fn mul(&self, a: &Element<T>, b: &Element<T>) -> Element<T>;
+    fn pow(&self, a: &Element<T>, b: &Integer) -> Element<T>;
 }
 
 
@@ -59,20 +62,22 @@ impl<T: HasMul + HasRepresentation + Clone> Element<T> {
 
 
 impl<T: HasMul + HasRepresentation + Clone> Element<T> {
-    pub fn pow(&self, mut a: Integer) -> Element<T> {
-        let mut product = Element::new(self.get_outer_structure(), Integer::ONE.clone());
-        let mut base = self.clone();
+    pub fn pow(&self, a: &Integer) -> Element<T> {
+        // let mut product = Element::new(self.get_outer_structure(), Integer::ONE.clone());
+        // let mut base = self.clone();
+        //
+        // while !a.is_zero() {
+        //     if a.get_bit(0) {
+        //         product = product.mul_ref(&base);
+        //     }
+        //     base = base.mul_ref(&base);
+        //
+        //     a = a >> 1;
+        // }
+        //
+        // product
 
-        while !a.is_zero() {
-            if a.get_bit(0) {
-                product = product.mul_ref(&base);
-            }
-            base = base.mul_ref(&base);
-
-            a = a >> 1;
-        }
-
-        product
+        self.get_outer_structure().pow(self, a)
     }
 }
 
