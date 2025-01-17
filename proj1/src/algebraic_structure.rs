@@ -1,5 +1,3 @@
-// This is in addition to computational algebra a personal learning experience with rust.
-
 use rug::Integer;
 use std::sync::Arc;
 pub mod finite_field;
@@ -28,8 +26,11 @@ pub trait HasAdd<T: HasRepresentation + Clone = Self> {
 }
 
 
-pub trait HasMulInv<T: HasRepresentation + HasMul + Clone = Self> {
+pub trait HasDiv<T: HasRepresentation + HasMul + Clone = Self>: HasMul<T> {
     fn inv(&self, a: &Element<T>) -> Element<T>;
+    fn div(&self, a: &Element<T>, b: &Element<T>) -> Element<T> {
+        self.mul(&a, &self.inv(&b))
+    }
 }
 
 
@@ -72,8 +73,12 @@ impl<T: HasAdd + HasRepresentation + Clone> Element<T> {
 }
 
 
-impl<T: HasMulInv + HasMul + HasRepresentation + Clone> Element<T> {
+impl<T: HasDiv + HasMul + HasRepresentation + Clone> Element<T> {
     pub fn inv(&self) -> Element<T> {
         self.outer_structure.inv(&self)
+    }
+
+    pub fn div_ref(&self, b: &Element<T>) -> Element<T> {
+        self.outer_structure.div(&self, b)
     }
 }

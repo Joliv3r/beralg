@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-feanor-math = "3.0.7"
-number-theory = "0.0.24"
+plotters = "0.3.7"
 rand = "0.8.5"
 rug = "1.26.1"
 
-[patch.crates-io]
-number-theory = { path = "/home/joliver/rust/ENT/" }
+[profile.release]
+panic = 'abort'

@@ -1,12 +1,9 @@
-// This module uses a lot of cloning of structures, which can be avoided by elements having
-// reference to outer structure.
-
 use crate::algebraic_structure::{Element, HasAdd, HasMul, HasRepresentation};
 use crate::integer_computations::{extended_euclidean_ordered, extended_euclidean_to_integers, pow_rug};
 use rug::{integer::IsPrime, Complete, Integer};
 
 
-use super::HasMulInv;
+use super::HasDiv;
 
 #[derive(Debug, Clone)]
 pub struct FiniteField {
@@ -89,8 +86,11 @@ impl FiniteField {
 }
 
 
-impl HasMulInv for FiniteField {
+impl HasDiv for FiniteField {
     fn inv(&self, a: &Element<Self>) -> Element<Self> {
+        if a.get_rep().is_zero() {
+            panic!("Zero Division");
+        }
         let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
         Element::new(
             a.get_outer_structure(),
@@ -165,8 +165,11 @@ impl MultiplicativeGroup {
 }
 
 
-impl HasMulInv for MultiplicativeGroup {
+impl HasDiv for MultiplicativeGroup {
     fn inv(&self, a: &Element<Self>) -> Element<Self> {
+        if a.get_rep().is_zero() {
+            panic!("Zero Division");
+        }
         let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
         Element::new(
             a.get_outer_structure(),

@@ -1,13 +1,11 @@
-use primes::generate_primes;
+// This is in addition to computational algebra a personal learning experience with rust.
 
 pub mod algebraic_structure;
 pub mod tests;
 pub mod integer_computations;
-pub mod primes;
 
 
 fn main() {
-    // check_timing_against_rug();
-    // check_timing_against_naive();
-    generate_primes(1000000);
+    let n: u32 = 100;
+    tests::check_timings(n).expect("Should not fail");
 }
