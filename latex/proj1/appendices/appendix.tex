@@ -1,0 +1,36 @@
+\subsection{Commutative Diagram Example}
+\begin{center}
+\[\begin{tikzcd}
+	&& {X \times Y} \\
+	\\
+	X && {X \coprod Y} && Y
+	\arrow[from=3-1, to=1-3]
+	\arrow[from=3-1, to=3-3]
+	\arrow[dashed, from=3-3, to=1-3]
+	\arrow[from=3-5, to=1-3]
+	\arrow[from=3-5, to=3-3]
+\end{tikzcd}\]
+\end{center}
+
+
+\subsection{Flow Chart Example}
+
+\begin{center}
+\begin{tikzpicture}[node distance = 2cm, auto]
+    % Place nodes
+    \node [block] (init) {Learning \LaTeX};
+    \node [cloud, left of=init] (you) {You};
+    \node [block, below of=init] (new_project) {Making new project};
+    \node [decision, below of=new_project] (decide) {Is the template good enough?};
+    \node [block, right of=new_project, node distance=3cm] (no) {Improve the template};
+    \node [block, below of=decide, node distance=3cm] (yes) {Get to work!};
+
+    % Draw edges
+    \path [line] (init) -- (new_project);
+    \path [line] (new_project) -- (decide);
+    \path [line] (decide) -- node {Yes} (yes);
+    \path [line] (decide) -| node [near start] {No} (no);
+    \path [line] (no) -- (new_project);
+    \path [line,dashed] (you) -- (init);
+\end{tikzpicture}
+\end{center}
