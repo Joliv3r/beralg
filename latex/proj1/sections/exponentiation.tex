@@ -1,0 +1,41 @@
+\section{Exponentiation}
+
+We will now consider the problem 
+
+\begin{equation}
+  a^b \mod{p}
+  \label{eq:exp}
+\end{equation}
+
+for $p$ a prime. Naively you can implement this very simply as
+
+\begin{minted}{rust}
+  pub fn naive_pow(a: &Integer, b: &Integer, n: &Integer) -> Integer {
+      let mut product: Integer = Integer::ONE.clone();
+      let s = b.to_u64().expect("The number is WAY too high to naively calculate.");
+      for _ in 1..s {
+          product *= a;
+          product %= n;
+      }
+      product
+  }
+\end{minted}
+
+However, we may notice that
+
+\begin{equation}
+  \sum_{i=0}^n a_i \cdot 2^i
+  \label{eq:binary_rep}
+\end{equation}
+
+where $a_i \in \cbrack{0, 1}$. This is just the binary expansion of $b$, so we may write
+
+\begin{equation}
+  a^b = a^{\sum_{i=0}^n a_i \cdot 2^i} = \prod_{i=0}^n a_i a^{2^i}
+\end{equation}
+
+which means we only need to square $a$ a total of $n$ times and figure out if we will multiply this product to our final product.
+This may simply be done by checking the last bit of the binary representation of $b$, which a computer always uses as representation anyways, and then we may bit shift $b$ and for the next loop we can check the last bit again.
+An implementation of this is found in the appendix \ref{sec:exp}.
+
+We can so 

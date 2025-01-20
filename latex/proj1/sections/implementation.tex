@@ -1,3 +1,44 @@
-\section{Implementations}
+\section{Implementations of modular arithmetic}
 
 As we will deal with large integers, specifically larger than $2^{128}-1$, we will use the crate \href{https://docs.rs/rug/latest/rug/}{rug} for the integer implementation.
+We will work in the multiplicative group $\mathbb{F}_p^*$, so division is well defined and must then be implemented.
+Now we will define division as multiplication by the inverse, that is 
+
+\begin{equation}
+  a / b = ab^{-1}, \quad a, b \in \mathbb{F}_p^*.
+  \label{eq:division}
+\end{equation}
+
+To find the inverse, we will use the Extended Euclidean algorithm as found in the appendix \ref{sec:ext-euclid-alg}.
+Now to do division, we will just do the Extended Euclidean algorithm, which takes $(a, b)$ and gives us $(d, x, y)$ such that
+
+\begin{equation}
+  ax + by = d
+  \label{eq:ext-euclid-alg}
+\end{equation}
+
+and by using $b = p$ we get $ax + bp = 1$. Thus
+
+\begin{equation}
+  ax \equiv 1 \pmod{p}.
+\end{equation}
+
+So in short we have inversion:
+
+\begin{minted}{rust}
+  fn mul_inv(&self, a: &Element<Self>) -> Element<Self> {
+      let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
+      Element::new(
+          a.get_outer_structure(),
+          y
+      )
+  }
+\end{minted}
+
+and division:
+
+\begin{minted}{rust}
+  fn div(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self> {
+      self.mul(a, &self.mul_inv(&b))
+  }
+\end{minted}

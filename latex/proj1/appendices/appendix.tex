@@ -1,36 +1,59 @@
-\subsection{Commutative Diagram Example}
-\begin{center}
-\[\begin{tikzcd}
-	&& {X \times Y} \\
-	\\
-	X && {X \coprod Y} && Y
-	\arrow[from=3-1, to=1-3]
-	\arrow[from=3-1, to=3-3]
-	\arrow[dashed, from=3-3, to=1-3]
-	\arrow[from=3-5, to=1-3]
-	\arrow[from=3-5, to=3-3]
-\end{tikzcd}\]
-\end{center}
+\subsection{Extended Euclidean Algorithm}
+\label{sec:ext-euclid-alg}
+\begin{minted}{rust}
+  use rug::{Complete, Integer};
+
+  pub fn extended_euclidean_ordered(a: &Integer, b: &Integer) -> (Integer, Integer, Integer) {
+      // There have been no attempt to optimize this function using cloning and references
+      // efficiently.
+      let mut a1: Integer = a.clone();
+      let mut b1: Integer = b.clone();
+
+      if b.is_zero() {
+          return (a1, Integer::ONE.clone(), Integer::ZERO.clone())
+      };
+
+      let mut x2: Integer = Integer::ONE.clone();
+      let mut x1: Integer = Integer::ZERO.clone();
+      let mut y2: Integer = Integer::ZERO.clone();
+      let mut y1: Integer = Integer::ONE.clone();
 
 
-\subsection{Flow Chart Example}
+      while b1 > Integer::ZERO {
+          // q = a1/b1;
+          let (q, _) = (a1.div_rem_floor_ref(&b1)).complete();
+          let r = a1 - &q*&b1;
+          let x = x2 - &q*&x1;
+          let y = y2 - &q*&y1;
+          a1 = b1;
+          b1 = r;
+          x2 = x1;
+          x1 = x;
+          y2 = y1;
+          y1 = y;
+      };
 
-\begin{center}
-\begin{tikzpicture}[node distance = 2cm, auto]
-    % Place nodes
-    \node [block] (init) {Learning \LaTeX};
-    \node [cloud, left of=init] (you) {You};
-    \node [block, below of=init] (new_project) {Making new project};
-    \node [decision, below of=new_project] (decide) {Is the template good enough?};
-    \node [block, right of=new_project, node distance=3cm] (no) {Improve the template};
-    \node [block, below of=decide, node distance=3cm] (yes) {Get to work!};
+      (a1, x2, y2)
+  }
+\end{minted}
 
-    % Draw edges
-    \path [line] (init) -- (new_project);
-    \path [line] (new_project) -- (decide);
-    \path [line] (decide) -- node {Yes} (yes);
-    \path [line] (decide) -| node [near start] {No} (no);
-    \path [line] (no) -- (new_project);
-    \path [line,dashed] (you) -- (init);
-\end{tikzpicture}
-\end{center}
+
+\subsection{Exponentiation}
+\label{sec:exp}
+
+\begin{minted}{rust}
+  pub fn pow_rug(a: &Integer, b: &Integer, n: &Integer) -> Integer {
+      let mut product: Integer = Integer::ONE.clone();
+      let mut base = a.clone() % n;
+      let mut exponent = b.clone();
+
+      while exponent != 0 {
+          if exponent.get_bit(0) {
+              product = (product * &base).modulo(n);
+          }
+          base = base.square().modulo(n);
+          exponent = exponent >> 1;
+      }
+      product
+  }
+\end{minted}
