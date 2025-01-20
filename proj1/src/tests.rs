@@ -45,6 +45,70 @@ pub fn check_timings(n: u32) -> Result<(), Box<dyn std::error::Error>> {
     let mut naive_vec: Vec<(u128, u128)> = Vec::new();
     let mut square_vec: Vec<(u128, u128)> = Vec::new();
     let mut max_time_naive = 0;
+    for _ in 0..n {
+        for _ in 0..3 {
+            p.next_prime_mut();
+        }
+
+        let a = p.clone(); //.random_below(&mut rng);
+        let b = p.clone(); //.random_below(&mut rng);
+        let (elapsed_naive, elapsed_square) = check_timing_against_naive(&a, &b, &p);
+        naive_vec.push((p.to_u128().unwrap(), elapsed_naive.as_nanos()));
+        square_vec.push((p.to_u128().unwrap(), elapsed_square.as_nanos()));
+        if elapsed_naive.as_nanos() > max_time_naive {
+            max_time_naive = elapsed_naive.as_nanos();
+        }
+    }
+
+    let root = SVGBackend::new("plots/naive-square.svg", (600, 400)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Runtime in nanoseconds", ("sans-serif", 25).into_font())
+        .margin(40)
+        .x_label_area_size(30)
+        .y_label_area_size(30)
+        .build_cartesian_2d(0..p.to_u128().unwrap_or(u128::MAX), 0..max_time_naive)?;
+
+    chart.configure_mesh().draw()?;
+
+    chart
+        .draw_series(LineSeries::new(
+            // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+            naive_vec,
+            &RED,
+        ))?
+        .label("Naive approach")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+        // .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+    chart
+        .draw_series(LineSeries::new(
+            // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+            square_vec,
+            &BLUE,
+        ))?
+        .label("Square approach")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+
+    chart
+        .configure_series_labels()
+        .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
+        .draw()?;
+
+    root.present()?;
+
+    Ok(())
+}
+
+
+pub fn check_timings_sep(n: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let mut p = Integer::from(17);
+    // let mut rng = RandState::new();
+    let mut naive_vec: Vec<(u128, u128)> = Vec::new();
+    let mut square_vec: Vec<(u128, u128)> = Vec::new();
+    let mut max_time_naive = 0;
     let mut max_time_square = 0;
     for _ in 0..n {
         for _ in 0..50 {
@@ -64,12 +128,12 @@ pub fn check_timings(n: u32) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let root = SVGBackend::new("plots/naive.svg", (640, 480)).into_drawing_area();
+    let root = SVGBackend::new("plots/naive.svg", (1920, 1080)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let mut chart = ChartBuilder::on(&root)
         .caption("Runtime in nanoseconds", ("sans-serif", 50).into_font())
-        .margin(5)
+        .margin(40)
         .x_label_area_size(30)
         .y_label_area_size(30)
         .build_cartesian_2d(0..p.to_u128().unwrap_or(u128::MAX), 0..max_time_naive)?;
@@ -99,7 +163,7 @@ pub fn check_timings(n: u32) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut chart = ChartBuilder::on(&root)
         .caption("Runtime in nanoseconds", ("sans-serif", 50).into_font())
-        .margin(5)
+        .margin(40)
         .x_label_area_size(30)
         .y_label_area_size(30)
         .build_cartesian_2d(0..p.to_u128().unwrap_or(u128::MAX), 0..max_time_square)?;
@@ -120,6 +184,8 @@ pub fn check_timings(n: u32) -> Result<(), Box<dyn std::error::Error>> {
         .background_style(&WHITE.mix(0.8))
         .border_style(&BLACK)
         .draw()?;
+
+    root.present()?;
 
     Ok(())
 }
@@ -151,12 +217,15 @@ mod tests {
             assert_eq!(b.get_rep(), &(&b_rand % &p).complete());
 
             let added = (a.add_ref(&b)).get_rep().clone();
+            let subtracted = (a.sub_ref(&b)).get_rep().clone();
             let multiplied = (a.mul_ref(&b)).get_rep().clone();
 
             let added_check: Integer = ((&a_rand % &p).complete() + (&b_rand % &p).complete()) % &p;
+            let sub_check: Integer = ((&a_rand % &p).complete() - (&b_rand % &p).complete()).modulo(&p);
             let mul_check: Integer = ((a_rand % &p) * (b_rand % &p)) % &p;
 
             assert_eq!(added, added_check, "Failed for: {} + {}, and got {} instead of {}", a.get_rep(), b.get_rep(), added, added_check);
+            assert_eq!(subtracted, sub_check, "Failed for: {} + {}, and got {} instead of {}", a.get_rep(), b.get_rep(), subtracted, sub_check);
             assert_eq!(multiplied, mul_check, "Failed for: {} * {}, and got {} instead of {}", a.get_rep(), b.get_rep(), multiplied, mul_check);
 
             let g: Arc<MultiplicativeGroup> = Arc::new(MultiplicativeGroup::from_finite_field(&f));
@@ -211,13 +280,13 @@ mod tests {
             let a_rand = (Integer::from(rng.bits(32)).modulo(&(&p-&Integer::ONE.clone()).complete())) + 1 ;
             let a = Element::new(f.clone(), a_rand);
 
-            let a_inv = a.inv();
+            let a_inv = a.mul_inv();
             assert_eq!(Integer::ONE, a_inv.mul_ref(&a).get_rep(), "We have a: {}, a_inv: {}, p: {}", a.get_rep(), a_inv.get_rep(), p);
 
             let g = Arc::new(MultiplicativeGroup::from_finite_field(&f));
             let a_rand = (Integer::from(rng.bits(32)).modulo(&(&p-&Integer::ONE.clone()).complete())) + 1 ;
             let a = Element::new(g.clone(), a_rand);
-            let a_inv = a.inv();
+            let a_inv = a.mul_inv();
             assert_eq!(Integer::ONE, a_inv.mul_ref(&a).get_rep(), "We have a: {}, a_inv: {}, p: {}", a.get_rep(), a_inv.get_rep(), p);
 
 

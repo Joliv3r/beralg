@@ -6,6 +6,8 @@ pub mod integer_computations;
 
 
 fn main() {
-    let n: u32 = 100;
-    tests::check_timings(n).expect("Should not fail");
+    let n: u32 = 500;
+    let m: u32 = 75;
+    tests::check_timings_sep(n).expect("Should not fail");
+    tests::check_timings(m).expect("Should not fail");
 }

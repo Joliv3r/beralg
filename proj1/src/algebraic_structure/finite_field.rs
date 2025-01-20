@@ -1,6 +1,8 @@
-use crate::algebraic_structure::{Element, HasAdd, HasMul, HasRepresentation};
+use crate::algebraic_structure::{Element, HasAdd, HasMul, HasRepresentation, HasSub};
 use crate::integer_computations::{extended_euclidean_ordered, extended_euclidean_to_integers, pow_rug};
+use rug::ops::SubFrom;
 use rug::{integer::IsPrime, Complete, Integer};
+use std::sync::Arc;
 
 
 use super::HasDiv;
@@ -46,6 +48,32 @@ impl HasAdd for FiniteField {
 }
 
 
+impl HasDiv for FiniteField {
+    fn mul_inv(&self, a: &Element<Self>) -> Element<Self> {
+        if a.get_rep().is_zero() {
+            panic!("Zero Division");
+        }
+        let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
+        Element::new(
+            a.get_outer_structure(),
+            y
+        )
+    }
+}
+
+
+impl HasSub for FiniteField {
+    fn add_inv(&self, a: &Element<Self>) -> Element<Self> {
+        let mut representation: Integer = a.get_rep().clone();
+        representation.sub_from(self.mod_num());
+        Element {
+            outer_structure: a.get_outer_structure().clone(),
+            representation,
+        }
+    }
+}
+
+
 impl FiniteField {
     pub fn new(size: Integer) -> Option<FiniteField> {
         if size.is_probably_prime(30) != IsPrime::No {
@@ -54,6 +82,20 @@ impl FiniteField {
             })
         } else {
             None
+        }
+    }
+
+    pub fn one(self) -> Element<FiniteField> {
+        Element {
+            outer_structure: Arc::new(self),
+            representation: Integer::ONE.clone(),
+        }
+    }
+
+    pub fn zero(self) -> Element<FiniteField> {
+        Element {
+            outer_structure: Arc::new(self),
+            representation: Integer::ZERO.clone(),
         }
     }
 
@@ -81,20 +123,6 @@ impl FiniteField {
                 a.get_outer_structure(),
                 y
             ),
-        )
-    }
-}
-
-
-impl HasDiv for FiniteField {
-    fn inv(&self, a: &Element<Self>) -> Element<Self> {
-        if a.get_rep().is_zero() {
-            panic!("Zero Division");
-        }
-        let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
-        Element::new(
-            a.get_outer_structure(),
-            y
         )
     }
 }
@@ -166,10 +194,7 @@ impl MultiplicativeGroup {
 
 
 impl HasDiv for MultiplicativeGroup {
-    fn inv(&self, a: &Element<Self>) -> Element<Self> {
-        if a.get_rep().is_zero() {
-            panic!("Zero Division");
-        }
+    fn mul_inv(&self, a: &Element<Self>) -> Element<Self> {
         let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
         Element::new(
             a.get_outer_structure(),
@@ -177,5 +202,3 @@ impl HasDiv for MultiplicativeGroup {
         )
     }
 }
-
-

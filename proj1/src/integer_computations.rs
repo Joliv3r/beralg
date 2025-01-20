@@ -63,11 +63,12 @@ pub fn pow_rug(a: &Integer, b: &Integer, n: &Integer) -> Integer {
 }
 
 
-#[allow(unconditional_recursion)]
 pub fn naive_pow(a: &Integer, b: &Integer, n: &Integer) -> Integer {
-    if b.is_zero() {
-        a.clone() % n
-    } else {
-        a*naive_pow(a, &(b-Integer::ONE).complete(), n) % n
+    let mut product: Integer = Integer::ONE.clone();
+    let s = b.to_u64().expect("The number is WAY too high to naively calculate.");
+    for _ in 1..s {
+        product *= a;
+        product %= n;
     }
+    product
 }

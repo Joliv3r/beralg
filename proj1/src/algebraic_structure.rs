@@ -8,29 +8,37 @@ pub trait HasRepresentation {
 }
 
 
+pub trait HasMul: HasRepresentation + Clone {
+    fn mul(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self>;
+    fn pow(&self, a: &Element<Self>, b: &Integer) -> Element<Self>;
+}
+
+
+pub trait HasAdd: HasRepresentation + Clone {
+    fn add(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self>;
+}
+
+
+pub trait HasSub: HasAdd {
+    fn add_inv(&self, a: &Element<Self>) -> Element<Self>;
+    fn sub_ref(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self> {
+        self.add(a, &self.add_inv(b))
+    }
+}
+
+
+pub trait HasDiv: HasMul {
+    fn mul_inv(&self, a: &Element<Self>) -> Element<Self>;
+    fn div(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self> {
+        self.mul(a, &self.mul_inv(&b))
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub struct Element<T: HasRepresentation + Clone> {
     outer_structure: Arc<T>,
     representation: Integer,
-}
-
-
-pub trait HasMul<T: HasRepresentation + Clone = Self> {
-    fn mul(&self, a: &Element<T>, b: &Element<T>) -> Element<T>;
-    fn pow(&self, a: &Element<T>, b: &Integer) -> Element<T>;
-}
-
-
-pub trait HasAdd<T: HasRepresentation + Clone = Self> {
-    fn add(&self, a: &Element<T>, b: &Element<T>) -> Element<T>;
-}
-
-
-pub trait HasDiv<T: HasRepresentation + HasMul + Clone = Self>: HasMul<T> {
-    fn inv(&self, a: &Element<T>) -> Element<T>;
-    fn div(&self, a: &Element<T>, b: &Element<T>) -> Element<T> {
-        self.mul(&a, &self.inv(&b))
-    }
 }
 
 
@@ -52,33 +60,41 @@ impl<T: HasRepresentation + Clone> Element<T> {
 }
 
 
-impl<T: HasMul + HasRepresentation + Clone> Element<T> {
+impl<T: HasMul> Element<T> {
     pub fn mul_ref(&self, _rhs: &Element<T>) -> Element<T> {
         self.outer_structure.mul(&self, _rhs)
     }
-}
 
-
-impl<T: HasMul + HasRepresentation + Clone> Element<T> {
     pub fn pow(&self, a: &Integer) -> Element<T> {
         self.get_outer_structure().pow(self, a)
     }
 }
 
 
-impl<T: HasAdd + HasRepresentation + Clone> Element<T> {
+impl<T: HasAdd> Element<T> {
     pub fn add_ref(&self, _rhs: &Element<T>) -> Element<T> {
         self.outer_structure.add(&self, _rhs)
     }
 }
 
 
-impl<T: HasDiv + HasMul + HasRepresentation + Clone> Element<T> {
-    pub fn inv(&self) -> Element<T> {
-        self.outer_structure.inv(&self)
+impl<T: HasDiv> Element<T> {
+    pub fn mul_inv(&self) -> Element<T> {
+        self.outer_structure.mul_inv(&self)
     }
 
     pub fn div_ref(&self, b: &Element<T>) -> Element<T> {
         self.outer_structure.div(&self, b)
+    }
+}
+
+
+impl<T: HasSub> Element<T> {
+    pub fn add_inv(&self) -> Element<T> {
+        self.outer_structure.add_inv(&self)
+    }
+
+    pub fn sub_ref(&self, b: &Element<T>) -> Element<T> {
+        self.outer_structure.sub_ref(&self, b)
     }
 }
