@@ -38,7 +38,47 @@
 \end{minted}
 
 
-\subsection{Exponentiation}
+\subsubsection{Modular Inversion}
+\label{sec:Modular Inversion}
+\begin{minted}{rust}
+  fn mul_inv(&self, a: &Element<Self>) -> Element<Self> {
+      if a.get_rep().is_zero() {
+          panic!("Zero Division");
+      }
+      let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
+      Element::new(
+          a.get_outer_structure(),
+          y
+      )
+  }
+\end{minted}
+
+
+\subsection{Modular Division}
+\label{sub:Modular Division}
+\begin{minted}{rust}
+  fn div(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self> {
+      self.mul(a, &self.mul_inv(&b))
+  }
+\end{minted}
+
+
+\subsection{Naive exponentiation}
+\label{sec:naive_exp}
+
+\begin{minted}{rust}
+  pub fn naive_pow(a: &Integer, b: &Integer, n: &Integer) -> Integer {
+      let mut product: Integer = Integer::ONE.clone();
+      let s = b.to_u64().expect("The number is WAY too high to naively calculate.");
+      for _ in 1..s {
+          product *= a;
+          product %= n;
+      }
+      product
+  }
+\end{minted}
+
+\subsection{Square-and-multiply exponentiation}
 \label{sec:exp}
 
 \begin{minted}{rust}

@@ -3,39 +3,98 @@
 We will now consider the problem 
 
 \begin{equation}
-  a^b \mod{p}
+  a^n \mod{p}
   \label{eq:exp}
 \end{equation}
 
 for $p$ a prime. Naively you can implement this very simply as
 
-\begin{minted}{rust}
-  pub fn naive_pow(a: &Integer, b: &Integer, n: &Integer) -> Integer {
-      let mut product: Integer = Integer::ONE.clone();
-      let s = b.to_u64().expect("The number is WAY too high to naively calculate.");
-      for _ in 1..s {
-          product *= a;
-          product %= n;
-      }
-      product
-  }
-\end{minted}
+\begin{algorithm}
+  \caption{Naive exponentiation}
+  \label{alg:naive_exp}
+  \textbf{Input:} $a \in \M{Z}_p, \quad n \in \M{Z}, \quad p \in \M{Z}$. \\
+  \textbf{Output:} $a^n \mod{p}$
+  \begin{algorithmic}[1]
+    \State $b \gets 1$
+    \For{$i$ from $1$ to $n$}
+      \State $b \gets b \cdot a \mod{p}$
+    \EndFor \\
+    \Return $b$
+  \end{algorithmic}
+\end{algorithm}
 
-However, we may notice that
+However, we notice that this is very many multiplications for large $b$.
+So we introduce another algorithm
+
+\begin{algorithm}
+  \caption{Square-and-Multiply exponentiation}
+  \label{alg:square-and-multiply}
+  \textbf{Input:} $a \in \M{Z}_p, \quad n \in \M{Z}, \quad p \in \M{Z}$. \\
+  \textbf{Output:} $a^n \mod{p}$
+  \begin{algorithmic}[1]
+    \State $b \gets 1$
+    \State $e \gets a \mod{p}$
+    \While{$n \neq 0$}
+      \If{last bit of the binary representation of $n$ is 1}
+        \State $b \gets b \cdot e \mod{p}$
+      \EndIf
+      \State $e \gets e^2 \mod{p}$
+      \State right bitwise shift of $n$
+    \EndWhile \\
+    \Return $b$
+  \end{algorithmic}
+\end{algorithm}
+
+
+Now we have stated our algorithms for exponentiation. Let us do some cost analysis. \\
+
+
+\subsection{Analysis of Exponentiation Algorithms}
+
+We first consider the naive exponentiation algorithm as explained in \autoref{alg:naive_exp}.
+Firstly we note that the for loop does exactly $n$ loops, and one modular multiplication per loop.
+So we have a total of $\O \nbrack{n}$ modular multiplications.
+
+Looking at the square-and-multiply algorithm as described in \autoref{alg:square-and-multiply}, we note that the while loop will loop $\lceil \log n \rceil$ times.
+In the worst case we will then do 2 modular multiplications per loop in addition to a right bitshift, which is virtually nothing.
+So we do $\O \nbrack{2\log n} = \O \nbrack{ \log n }$ modular multiplications, which is significantly less than the naive algorithm.
+
+Each of these modular multiplications we know costs $\O \log^2 p$, so we have the following theoretical costs:
 
 \begin{equation}
-  \sum_{i=0}^n a_i \cdot 2^i
-  \label{eq:binary_rep}
+  \label{ref:costs}
+  \begin{array}{rl}
+    \text{Naive:} & \O \bbrack{ n \nbrack{\log p}^2 } \\
+    \\
+    \text{Square-and-Multiply:} & \O \bbrack{ \nbrack{ \log n } \nbrack{ \log p }^2 }
+  \end{array}
 \end{equation}
 
-where $a_i \in \cbrack{0, 1}$. This is just the binary expansion of $b$, so we may write
+Looking at the figures we see in \autoref{fig:naive-plot} that the naive exponentiation is in fact linear.
+Likewise supporting our theoretical analysis we can note that the Square-and-Multiply approach as plotted in \autoref{fig:square} is logarithmic.
+Now looking at \autoref{fig:square-naive}, we can see that there are in fact a huge difference.
+In fact in this example, you can not really see any difference in these times.
 
-\begin{equation}
-  a^b = a^{\sum_{i=0}^n a_i \cdot 2^i} = \prod_{i=0}^n a_i a^{2^i}
-\end{equation}
 
-which means we only need to square $a$ a total of $n$ times and figure out if we will multiply this product to our final product.
-This may simply be done by checking the last bit of the binary representation of $b$, which a computer always uses as representation anyways, and then we may bit shift $b$ and for the next loop we can check the last bit again.
-An implementation of this is found in the appendix \ref{sec:exp}.
+\begin{figure}
+  \begin{center}
+    \includesvg[inkscapelatex=false, width=0.9\textwidth, keepaspectratio]{images/naive.svg}
+  \end{center}
+  \caption{Naive Exponentiation}\label{fig:naive-plot}
+\end{figure}
 
-We can so 
+\begin{figure}
+  \begin{center}
+    \includesvg[inkscapelatex=false, width=0.9\textwidth, keepaspectratio]{images/square.svg}
+  \end{center}
+  \caption{Exponentiation using the Square-and-Multiply algorithm}\label{fig:square}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includesvg[inkscapelatex=false, width=0.9\textwidth, keepaspectratio]{images/naive-square.svg}
+  \end{center}
+  \caption{Comparison of naive exponentiation and Square-and-Multiply}\label{fig:square-naive}
+\end{figure}
+
+

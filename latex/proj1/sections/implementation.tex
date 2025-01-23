@@ -24,21 +24,3 @@ and by using $b = p$ we get $ax + bp = 1$. Thus
 \end{equation}
 
 So in short we have inversion:
-
-\begin{minted}{rust}
-  fn mul_inv(&self, a: &Element<Self>) -> Element<Self> {
-      let (_, _, y) = extended_euclidean_ordered(self.mod_num(), a.get_rep());
-      Element::new(
-          a.get_outer_structure(),
-          y
-      )
-  }
-\end{minted}
-
-and division:
-
-\begin{minted}{rust}
-  fn div(&self, a: &Element<Self>, b: &Element<Self>) -> Element<Self> {
-      self.mul(a, &self.mul_inv(&b))
-  }
-\end{minted}
