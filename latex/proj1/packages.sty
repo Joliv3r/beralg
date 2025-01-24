@@ -45,11 +45,25 @@
 
 % --- Code ---
 \usepackage[outputdir=aux]{minted}
+\setminted[rust]{
+  linenos,
+  % bgcolor=lightgray,
+  tabsize=2,
+  breaklines,
+}
+\setminted[toml]{
+  % bgcolor=lightgray,
+  linenos,
+  breaklines,
+  tabsize=2,
+}
 \usepackage{algpseudocode}
 \usepackage{algorithm}
+\usepackage{listings}
 
 % --- Colors ---
 \usepackage[dvipsnames]{xcolor} % Using colors in LaTeX. This package is placed here as it needs to be imported previous to the flow chart packages to ensure no errors.
+\definecolor{lightgray}{rgb}{0.9,0.9,0.9}
 
 % --- Flow Charts ---
 % Keep in mind that you may customize these flow chart settings to fit your own preferences.

@@ -9,8 +9,8 @@ Now we will define division as multiplication by the inverse, that is
   \label{eq:division}
 \end{equation}
 
-To find the inverse, we will use the Extended Euclidean algorithm as found in the appendix \ref{sec:ext-euclid-alg}.
-Now to do division, we will just do the Extended Euclidean algorithm, which takes $(a, b)$ and gives us $(d, x, y)$ such that
+To find the inverse, we will use the Extended Euclidean algorithm as found in the Appendix \ref{sec:integer-computations}.
+Now to do division, we will just compute the Extended Euclidean algorithm, which takes $(a, b)$ and gives us $(d, x, y)$ such that
 
 \begin{equation}
   ax + by = d
@@ -23,4 +23,4 @@ and by using $b = p$ we get $ax + bp = 1$. Thus
   ax \equiv 1 \pmod{p}.
 \end{equation}
 
-So in short we have inversion:
+So our $x$ will in this case be the inverse.

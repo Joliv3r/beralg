@@ -1,5 +1,27 @@
 \section{Exponentiation}
 
+\begin{figure}
+  \begin{center}
+    \includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{images/naive.svg}
+  \end{center}
+  \caption{Naive exponentiation of $a^n \mod{p}$ where $n=p$.}\label{fig:naive-plot}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{images/square.svg}
+  \end{center}
+  \caption{Exponentiation using square-and-multiply of $a^n \mod{p}$ where $n=p$, plotted with a logarithmic $x$-axis.}\label{fig:square}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{images/naive-square.svg}
+  \end{center}
+  \caption{Comparison of naive exponentiation and square-and-multiply of $a^n \mod{p}$, where $n=p$.}\label{fig:square-naive}
+\end{figure}
+
+
 We will now consider the problem 
 
 \begin{equation}
@@ -55,46 +77,32 @@ We first consider the naive exponentiation algorithm as explained in \autoref{al
 Firstly we note that the for loop does exactly $n$ loops, and one modular multiplication per loop.
 So we have a total of $\O \nbrack{n}$ modular multiplications.
 
-Looking at the square-and-multiply algorithm as described in \autoref{alg:square-and-multiply}, we note that the while loop will loop $\lceil \log n \rceil$ times.
-In the worst case we will then do 2 modular multiplications per loop in addition to a right bitshift, which is virtually nothing.
+Looking at the square-and-multiply algorithm as described in \autoref{alg:square-and-multiply}, we note that the while loop will loop $\lfloor \log n \rfloor$ times.
+In the worst case we will then do 2 modular multiplications per loop in addition to a right bitshift.
+The bitshift takes virtually no time in comparison to the modular multiplications, and so we ignore this computation.
 So we do $\O \nbrack{2\log n} = \O \nbrack{ \log n }$ modular multiplications, which is significantly less than the naive algorithm.
+After some experimental tests, the operation of doing modular multiplication is roughly constant for the size of the integers which are used here, so we can assume that the multiplication is constant.
+We then have the following computational costs:
 
-Each of these modular multiplications we know costs $\O \log^2 p$, so we have the following theoretical costs:
 
 \begin{equation}
   \label{ref:costs}
   \begin{array}{rl}
-    \text{Naive:} & \O \bbrack{ n \nbrack{\log p}^2 } \\
-    \\
-    \text{Square-and-Multiply:} & \O \bbrack{ \nbrack{ \log n } \nbrack{ \log p }^2 }
+    \text{Naive:} & \O \nbrack{n} \\
+    \text{Square-and-Multiply:} & \O \nbrack{ \log n }
   \end{array}
 \end{equation}
 
-Looking at the figures we see in \autoref{fig:naive-plot} that the naive exponentiation is in fact linear.
+Looking at the plots, we see in \autoref{fig:naive-plot} that the naive exponentiation is in fact linear.
 Likewise supporting our theoretical analysis we can note that the Square-and-Multiply approach as plotted in \autoref{fig:square} is logarithmic.
-Now looking at \autoref{fig:square-naive}, we can see that there are in fact a huge difference.
-In fact in this example, you can not really see any difference in these times.
+Now looking at \autoref{fig:square-naive}, we can see that there is in fact a huge difference, as expected based on our analysis.
 
+These plots are made setting $n=p$ and choosing $a$ randomly with the same amount of digits as $p$.
+Not choosing $n$ randomly is done because this would result in no very apparent pattern, as the running time of the method would be very dependent on the size of the exponent, and we would just have a plot with seemingly random points.
 
-\begin{figure}
-  \begin{center}
-    \includesvg[inkscapelatex=false, width=0.9\textwidth, keepaspectratio]{images/naive.svg}
-  \end{center}
-  \caption{Naive Exponentiation}\label{fig:naive-plot}
-\end{figure}
-
-\begin{figure}
-  \begin{center}
-    \includesvg[inkscapelatex=false, width=0.9\textwidth, keepaspectratio]{images/square.svg}
-  \end{center}
-  \caption{Exponentiation using the Square-and-Multiply algorithm}\label{fig:square}
-\end{figure}
-
-\begin{figure}
-  \begin{center}
-    \includesvg[inkscapelatex=false, width=0.9\textwidth, keepaspectratio]{images/naive-square.svg}
-  \end{center}
-  \caption{Comparison of naive exponentiation and Square-and-Multiply}\label{fig:square-naive}
-\end{figure}
+We may note that in \autoref{fig:square}, we can see that the plot is not as perfectly logarithmic as the naive exponentiation in \autoref{fig:naive-plot} is linear.
+This is probably because we always know exactly how many times the naive exponentiation multiplies, but square-and-multiply will do $2\cdot \lfloor \log n \rfloor$ multiplications given that $n=2^k-1$.
+So the amount of multiplications are also determined by the binary expansion of $n$, which will change based on what $p$ gets chosen.
+This will contribute to the more chaotic graph we are seeing in \autoref{fig:square}.
 
 
