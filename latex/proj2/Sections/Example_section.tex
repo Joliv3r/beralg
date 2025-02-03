@@ -1,0 +1,33 @@
+\section{Searching for primes}
+
+We are looking at the problem of finding primes.
+Our goal is to search for a random prime in the set $S_n = \cbrack{ 2^n, 2^n+1, \dots 2^{n+1}-1 }$.
+We consider the approach of randomly selecting a number from $S_n$ and then checking if this is a prime.
+Now to estimate how many primes we need to check we use the prime number theorem, which states that the number of primes $\pi (N)$ in the interval $\bbrack{2, N}$ is found with the distribution
+
+\begin{equation}
+  \pi(N) \sim \frac{N}{\ln N}
+  \label{eq:pmt}
+\end{equation}
+
+Let $\pi_n$ denote the number of prime numbers in $S_n$, then
+
+\begin{equation}
+  \pi_n = \pi\nbrack{ 2^{n+1} } - \pi\nbrack{ 2^{n} } \sim \frac{2^{n+1}}{\ln 2^{n+1}} - \frac{2^{n}}{\ln 2^{n}}
+  = \frac{ 2^{n} }{n \ln 2}.
+  \label{eq:primes-in-sn}
+\end{equation}
+
+Now imagine that we pick a random integer $q \in S_n$, then the probability $q$ being a prime is then
+
+\begin{equation}
+  \frac{\pi_n}{2^n} = \frac{1}{n\ln 2}
+  \label{eq:probability-of-prime}
+\end{equation}
+
+So the expected number of choices before we find a prime is $n \ln 2$.
+
+We can also consider another method for finding a random prime.
+Take a random number $a \in S_n$ and use some fixed $d \in \M{N}$ not too large such that we are reasonable sure that there exists a prime in the range $\cbrack{ a, a+1, \dots, a+d-1 } \cap S_n$, and then test the primality of these integers.
+
+
