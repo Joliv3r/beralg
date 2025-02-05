@@ -43,6 +43,23 @@
 \usepackage[nottoc]{tocbibind}  % Includes Bibliography, Index, list of Listing etc. to table of contents
 \newcommand{\source}[1]{\vspace{-4pt} \caption*{\hfill \footnotesize{Source: {#1}} } }   % Easily insert sources in images
 
+% --- Code Input ---
+\usepackage[outputdir=aux]{minted}
+\setminted[rust]{
+  linenos,
+  % bgcolor=lightgray,
+  tabsize=2,
+  breaklines,
+}
+\setminted[toml]{
+  % bgcolor=lightgray,
+  linenos,
+  breaklines,
+  tabsize=2,
+}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
 % --- Colors ---
 \usepackage[dvipsnames]{xcolor} % Using colors in LaTeX. This package is placed here as it needs to be imported previous to the flow chart packages to ensure no errors.
 

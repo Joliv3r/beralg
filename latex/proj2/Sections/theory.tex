@@ -1,0 +1,88 @@
+\section{Searching for primes}
+
+\subsection{Random search} \label{sec:random-search}
+  We are looking at the problem of finding primes.
+  Our goal is to search for a random prime in the set $S_n = \cbrack{ 2^n, 2^n+1, \dots 2^{n+1}-1 }$.
+  We consider the approach of randomly selecting a number from $S_n$ and then checking if this is a prime.
+  Now to estimate how many primes we need to check we use the prime number theorem, which states that the number of primes $\pi (N)$ in the interval $\bbrack{2, N}$ is found with the distribution
+
+  \begin{equation}
+    \pi(N) \sim \frac{N}{\ln N}
+    \label{eq:pmt}
+  \end{equation}
+
+  Let $\pi_n$ denote the number of prime numbers in $S_n$, then
+
+  \begin{equation}
+    \pi_n = \pi\nbrack{ 2^{n+1} } - \pi\nbrack{ 2^{n} } \sim \frac{2^{n+1}}{\ln 2^{n+1}} - \frac{2^{n}}{\ln 2^{n}}
+    = \frac{ 2^{n} }{n \ln 2}.
+    \label{eq:primes-in-sn}
+  \end{equation}
+
+  Now imagine that we pick a random integer $q \in S_n$, then the probability of $q$ being a prime is then
+
+  \begin{equation}
+    \mathcal{Q}_n = \frac{\pi_n}{2^n} = \frac{1}{n\ln 2}
+    \label{eq:probability-of-prime}
+  \end{equation}
+
+  So the expected number of choices before we find a prime is $n \ln 2$, which we can derive by looking at this as a geometric probability distribution.
+
+  So as an example, we choose $n = 500$.
+  Then we can expect to chose $500 \cdot \ln 2 = 347$ candidates before we find a prime. 
+
+
+\subsection{Search with interval}
+
+  We can also consider another method for finding a random prime.
+  Take a random number $a \in S_n$ and use some fixed $d \in \M{N}$ not too large such that we are reasonable sure that there exists a prime in the range $R_d = \cbrack{ a, a+1, \dots, a+d-1 } \cap S_n$, and then test the primality of these integers.
+  
+  We assume that the prime numbers are uniformly distributed over the whole interval.
+  Then we may assume that for every number $n = R_d$, the probability of this number being a prime is as described in \eqref{eq:probability-of-prime}.
+  Then we can do this reasoning for every number in the interval, which again gives us a geometric distribution and we have that the probability of there being a prime in this interval is
+
+  \begin{equation}
+    \mathcal{P}_d = 1 - \nbrack{ 1-\mathcal{Q}_n }^{d} = 1 - \nbrack{ 1-\frac{1}{n \ln 2} }^d.
+    \label{eq:probability-of-prime-in-rd}
+  \end{equation}
+
+  We want to fix $n$ and find a $d$ such that $\mathcal{P}_d$ is large enough for us to be happy.
+  Consider an example where we are looking for a $500$ bit prime number.
+  That is we consider $n=500$, and say we are happy with a confidence rate of $99\%$.
+  A quick numerical computation gives us $d = 1595$, so for this example we would need a width of $d = 1595$ to have a confidence of $99\%$ of finding a prime number.
+
+
+\subsection{Filtering Candidates}
+
+  We can now consider a method where we instead of choosing a completely random integer from the interval $S_n$, we rather shrink $S_n$ by removing all integers divisible by small primes.
+  By doing this we can be removing all even numbers remove half of $S_n$ and have a remaining set with order $1/2 \cdot |S_n|$.
+  Further we remove all numbers divisible by $3$, and thus remove a third of all numbers in $S_n$.
+  Since divisibility by $2$ and $3$ are independent, we will have a remaining set with order $2/6 \cdot |S_n|$.
+  In fact, divisibility by any two prime numbers are independent, so let $\M{P}_B$ denote the set of all prime numbers below a bound $B$.
+  Then after our filtration we have a set $\mathcal{F}_B$ of order
+
+  \begin{equation}
+    \linebrack{\mathcal{F}_B} = \linebrack{ S_n } \prod_{p\in \M{P}_B} \frac{p-1}{p}.
+    \label{eq:order-after-filtration}
+  \end{equation}
+
+  Now suppose we chose a random integer $a \in \mathcal{F}_B$, then since we have ruled out a number of non-primes in $S_n$, we will still have the same amount of primes in $\mathcal{F}_B$ as in $S_n$.
+  So the probability of $a$ being prime is
+
+  \begin{equation}
+    \frac{\pi_n}{\linebrack{\mathcal{F}_B}} = \frac{2^n}{n\ln 2 \cdot \linebrack{S_n}} \prod_{p \in \M{P}_B} \frac{p}{p-1}
+    = \frac{1}{n \ln 2} \prod_{p \in \M{P}_B} \frac{p}{p-1}.
+    \label{eq:probability-of-prime-in-fb}
+  \end{equation}
+
+  Further by our previous logic, we would expect to test
+
+  \begin{equation}
+    n \ln 2 \prod_{p \in \M{P}_B} \frac{p-1}{p}
+    \label{eq:candidates-teste-with-filtration}
+  \end{equation}
+  
+  candidates.
+
+  So take our usual example of $n = 500$, and let $B = 2000$.
+  Then after a, yet again, quick numerical calculation we get an expected number of candidates of $25.5$.

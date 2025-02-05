@@ -1,0 +1,61 @@
+\section{Implementation of Prime Search}
+
+\subsection{Miller-Rabin Primality Test}
+
+  To check if a number is prime we will use the Miller-Rabin primality test, which builds on the following principle.
+  Given $p$ an odd prime and $p-1 = 2^s r$ for $r$ an odd integer, let $a \in \M{N}$ such that $\operatorname{gcd}(a, n) = 1$.
+  Then either $a^r \equiv 1 \pmod{n}$ or $a^{2^j r} \equiv -1 \pmod{n}$ for some $0 \leq j \leq s-1$.
+  In fact for an odd composite number $q$, at most $1/4$ of the numbers in the interval $\bbrack{1, n-1}$ satisfies this property.
+  So we have an upper bound for the error of the Miller-Rabin primality test of $1/4$.
+  Now we can do the test $t$ times choosing some random $a \in \bbrack{1, n-1}$.
+  Then we have an upper error bound of $\nbrack{1/4}^t$.
+  This leads us to Algorithm~\ref{alg:miller-rabin}.
+  
+  \begin{algorithm}
+    \caption{Miller-Rabin Primality Test}
+    \label{alg:miller-rabin}
+    \textbf{Input:} $n \leq 3, t \leq 1$. \\
+    \textbf{Output:} Prime or Composite to the question ``Is $n$ prime?''
+    \begin{algorithmic}[1]
+      \State $r \gets n-1$
+      \State $s \gets 0$
+      \While{last bit of the binary representation of $r$ is 0}
+        \State right bitwise shift of $r$
+        \State $s \gets s+1$
+      \EndWhile
+
+      \For{$i$ from $1$ to $t$}
+        \State Choose a random integer $2 \leq a \leq n-2$.
+        \State $y \gets a^r \pmod{n}$
+        
+        \If{$y \neq 1$ and $y \neq n-1$ }
+          \State $j \gets 1$
+          \While{$j \leq s-1$ and $y \neq n-1$}
+            \State $y \gets y^2 \pmod{n}$
+            \If{$y=1$}
+              \Return Composite
+            \EndIf
+            \State $j \gets j+1$
+          \EndWhile
+          \If{$y \neq n-1$}
+            \Return Composite
+          \EndIf
+        \EndIf    
+      \EndFor \\
+      \Return Prime
+    \end{algorithmic}
+  \end{algorithm}
+
+  Now we consider the complexity of this algorithm.
+  The first while-loop will run $s$ times where $s \leq \log n$.
+  The next chunk of the algorithm is one large for-loop, which runs a total of $t$ times.
+  Here we do one modular exponentiation which we for our purposes will assume is done in $\O \bbrack{ \nbrack{ \log n }^3}$.
+  Then, if we are not done, we start a while-loop where the worst case scenario is $s-1$ loops, where we still have $s \leq \log n$.
+  We would then have a worst case scenario of $\O \bbrack{ t \nbrack{ \log n }^4 }$.
+
+
+\subsection{Finding a Prime}
+  We now go back to our first question in Section~\ref{sec:random-search}, and we will use the exact same approach.
+  We will pick a random number $a \in S_n = \bbrack{ 2^n, 2^n + 1, \dots, 2^{n+1}-1 }$ and check if $a$ is prime using Miller-Rabin.
+  As we have earlier discussed, we will expect testing $n \ln 2$ candidates before finding a prime.
+  
