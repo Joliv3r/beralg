@@ -49,13 +49,20 @@
   We want to fix $n$ and find a $d$ such that $\mathcal{P}_d$ is large enough for us to be happy.
   Consider an example where we are looking for a $500$ bit prime number.
   That is we consider $n=500$, and say we are happy with a confidence rate of $99\%$.
-  A quick numerical computation gives us $d = 1595$, so for this example we would need a width of $d = 1595$ to have a confidence of $99\%$ of finding a prime number.
+  A quick numerical computation gives us $d = 1594$, so for this example we would need a width of $d = 1594$ to have a confidence of $99\%$ of finding a prime number.
+
+  However, we will not anymore get a uniformly random prime number.
+  Say we do a random search of this interval as described in the previous section, we will more likely find fairly isolated primes.
+  As we choose some random $a \in S_n$ first, every prime number will appear in the same amount of intervals, discounting primes in the first or last $d$ numbers, which for large $n$ is negligible.
+  But the likelihood of a prime being found is then given by how many other primes there are in this interval.
+  If we methodically search for primes in this interval starting with $a$ and then go to $a+1$ and so on, the prime numbers likelihood of being chosen is determined by how long chain of composite numbers are directly in front of this prime number.
+  In this case for example the second prime in a twin prime pair is very unlikely of being chosen as there are only two possible randomly chosen numbers that result in this prime being found.
 
 
-\subsection{Filtering Candidates}
+\subsection{Filtering Candidates}\label{sec:filtering-candidates}
 
   We can now consider a method where we instead of choosing a completely random integer from the interval $S_n$, we rather shrink $S_n$ by removing all integers divisible by small primes.
-  By doing this we can be removing all even numbers remove half of $S_n$ and have a remaining set with order $1/2 \cdot |S_n|$.
+  By doing this we will remove all even numbers, thus remove half of $S_n$ and have a remaining set with order $1/2 \cdot |S_n|$.
   Further we remove all numbers divisible by $3$, and thus remove a third of all numbers in $S_n$.
   Since divisibility by $2$ and $3$ are independent, we will have a remaining set with order $2/6 \cdot |S_n|$.
   In fact, divisibility by any two prime numbers are independent, so let $\M{P}_B$ denote the set of all prime numbers below a bound $B$.

@@ -56,6 +56,104 @@
 
 \subsection{Finding a Prime}
   We now go back to our first question in Section~\ref{sec:random-search}, and we will use the exact same approach.
-  We will pick a random number $a \in S_n = \bbrack{ 2^n, 2^n + 1, \dots, 2^{n+1}-1 }$ and check if $a$ is prime using Miller-Rabin.
-  As we have earlier discussed, we will expect testing $n \ln 2$ candidates before finding a prime.
+  We will pick a random number $a \in S_n = \bbrack{ 2^n, 2^{n+1}-1 }$ and check if $a$ is prime using Miller-Rabin.
+  As we have earlier discussed, we expect to choose $n \ln 2$ candidates before finding a prime, and for all these candidates we will perform Miller-Rabin.
+  This equates to a runtime complexity of $\O \bbrack{ t n \nbrack{ \log n }^3 }$.
+  Of course this is not entirely accurate, as we often throw out the integer for being composite earlier than this worst case scenario of Miller-Rabin.
+
+  First of all I will in this implementation always generate a random $n$ bit odd number.
+  This is easily done by generating a random $n-1$ bit number and then do a left bitwise shift and add one.
+  This will half the number of possible generated numbers, and since it does not exclude any prime numbers, it will simply half the run time.
+
+
+\subsection{Trial Division \& Sieving}
+  Still we need to use Miller-Rabin to check every generated number for primality.
+  This is still a rather expensive operation, and we will therefore look at other improvements.
+  An option is doing trial division for small primes.
+  This will be done by pre-generating small primes under some bound $B$.
+  From our example in Section \ref{sec:random-search} and Section \ref{sec:filtering-candidates}, we can see that for $n=500$ and $B=2000$, we expect to rule out about $93\%$ of numbers before doing Miller-Rabin.
+  All these numbers that are ruled out by trial division will be ruled out in $\O \nbrack{ B/\ln B }$, by the prime number theorem.
+
+  A very similar approach can be done using sieving.
+  This is the method of filtering as described in Section \ref{sec:filtering-candidates}.
+  The advantage of this method over trial division, is that you do not need to even check for division with these small primes as any multiple of them will simply not be generated.
+  However we must generate a range that can be used for such generation.
+  In this case we are talking about fairly large ranges, so implementing some proper sieving is realistically not feasible.
+  We can rather take a random number $a \in S_n$ and then make a smaller interval, $\bbrack{ a, a+d-1 }$ and then remove every element divisible by some prime $p \in \mathbb{P}_B$.
+  We will use \eqref{eq:candidates-teste-with-filtration} and use the first degree Taylor series $b^d \approx 1 + d \ln b$, and so we choose
+
+  \begin{equation}
+    d =  - \frac{\mathcal{P}_d}{\ln \nbrack{ 1 - \frac{1}{n \ln 2} }}
+    \label{eq:filtration-constant}
+  \end{equation}
+
+
+\subsection{Some Experimental Data}
+
+  The specifications for the hardware used for running these programs are found in Table~\ref{tab:specs}.
+  The full code can be found in Appendix~\ref{sec:appendix} and \mintinline{sh}{cargo 1.86.0-nightly (0e3d73849 2025-02-01)} is used as our building tool.
+
+  \begin{table}
+    \begin{center}
+      \begin{tabular}[c]{l|l}
+        \hline
+        Host & 82A2 Lenovo Yoga Slim 7 (14ARE05) \\
+        CPU & AMD Ryzen 7 4700U with Radeon Graphics (8) @ 2.000GHz \\        
+        Memory & 16GB \\
+        Operating system & Arch Linux x86\_64 \\
+        Kernel & 6.12.10-arch1-1 \\
+        \hline
+      \end{tabular}
+    \end{center}
+    \caption{Laptop specifications}\label{tab:specs}
+  \end{table}
+
+  Our first goal is to find out a logical bound for the method using trial division as described earlier.
+  To do this we will generate a couple of sequences of composite numbers ending with a prime.
+  Then we use Miller-Rabin with trial division on every number generated and time this for different bounds $B$.
+  To find bounds for our sieving method, we take a very similar approach.
+  We generate some random integers in our interval and then use \eqref{eq:filtration-constant} as width, and time until a prime is found or it is discovered that the interval contains no primes.
+  This is still a bit random as we choose random numbers in the interval, however we do this as even as possible between the different tried bounds.
+
+
+  Now to look at this results one may peak at Table~\ref{tab:optimal-bounds}.
+  We here only consider the case of 500 bit numbers, but looking at the source code found in the appendix one can generate their selves these tables for other sizes of integers.
+  We can here see that the best pick of bounds are about $12000$ for sieving and about $350$ for trial division.
+  There is some randomness connected to these generated timings, so there might be some random noise contributing to these numbers.
+  It is also worth mentioning that these numbers might vary for other sizes of numbers.
+
+  \begin{table}[H]
+    \begin{center}
+      \begin{tabular}[c]{ll|ll}
+        \hline
+        \multicolumn{2}{l|}{\textbf{Sieving}} & 
+        \multicolumn{2}{l}{\textbf{Trial Division}} \\
+        \hline
+        Bound & Time (µs) & Bound & Time (µs) \\
+        \hline
+         2000   &  9533   &  50    &  9144 \\
+         3000   &  9412   &  100   &  8825 \\
+         4000   &  9228   &  150   &  8635 \\
+         5000   &  9244   &  200   &  8681 \\
+         6000   &  9146   &  250   &  8715 \\
+         7000   &  9104   &  300   &  8718 \\
+         8000   &  9084   &  350   &  8753 \\
+         9000   &  9225   &  400   &  8767 \\
+         10000  &  9182   &  450   &  8805 \\
+         11000  &  9199   &  500   &  8865 \\
+         12000  &  9054   &  550   &  8910 \\
+         13000  &  9121   &  600   &  8932 \\
+         14000  &  9220   &  650   &  8989 \\
+         15000  &  9176   &  700   &  9033 \\
+         16000  &  9113   &  750   &  9085 \\
+         17000  &  9274   &  800   &  9129 \\
+        \hline
+      \end{tabular}
+    \end{center}
+    \caption{Timing of sieving and trial division using different bounds on 500 bit numbers}\label{tab:optimal-bounds}
+  \end{table}
+
+  We now test sieving against trial division by simply generating $1000$ prime numbers using both these methods, with bounds of $12000$ and $150$ for sieving and trial division respectively.
+  Here we get the numbers $\SI{69259}{\SIUnitSymbolMicro \second}$ per prime for trial division and $\SI{13654}{\SIUnitSymbolMicro \second}$ per prime for sieving.
+  We therefore conclude that our implementation of sieving is faster than our implementation of trial division
   
