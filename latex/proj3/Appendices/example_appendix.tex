@@ -1,0 +1,1098 @@
+\subsection{\mintinline{bash}{src/lib.rs}}
+\begin{minted}{rust}
+pub mod lattice;
+\end{minted}
+
+\subsection{\mintinline{bash}{src/lattice.rs}}
+
+\begin{minted}{rust}
+extern crate openblas_src;
+
+use itertools::Itertools;
+use methods::gram_schmidt;
+use ndarray::Array1;
+use plotters::prelude::*;
+
+pub mod methods;
+
+#[derive(Debug)]
+// Due to complications, this is implemented for only f64, mostly because of time constraints.
+// TODO: Make Lattice<T> for some generic type.
+// We require basis to be of full rank.
+pub struct Lattice {
+    basis: Vec<Array1<f64>>,
+    gram_schmidt_basis: Vec<Array1<f64>>,
+}
+
+impl Lattice {
+    pub fn build_lattice_basis_from_vectors(basis: &Vec<Array1<f64>>) -> Option<Lattice> {
+        if !methods::is_linearly_independent(&basis) {
+            return None
+        }
+                
+        if basis.iter().map(|v| v.len()).all_equal() {
+            Some(Lattice {
+                basis: basis.clone(),
+                gram_schmidt_basis: methods::gram_schmidt(basis)
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn print_basis(&self) {
+        for i in &self.basis {
+            println!("{}", i);
+        }
+    }
+
+    pub fn print_gram_schmidt_basis(&self) {
+        for i in &self.gram_schmidt_basis {
+            println!("{}", i);
+        }
+    }
+
+    pub fn get_basis_columns(&self, start: usize, end: usize) -> Option<Vec<Array1<f64>>> {
+        // self.basis.slice_axis(Axis(1), slice)
+        if self.columns() < end {
+            return None
+        }
+        Some(self.basis[start..end].to_vec())
+    }
+
+    // Should only be called if Gram-Schmidt basis is already calculated
+    pub fn get_gram_schmidt_basis_columns(&self, start: usize, end: usize) -> Option<Vec<Array1<f64>>> {
+        // self.gram_schmidt_basis.slice_axis(Axis(1), slice)
+        if !self.index_exists(end-1) {
+            return None
+        }
+        Some(self.gram_schmidt_basis[start..end].to_vec())
+    }
+
+    pub fn get_lattice_point(&self, combination: &Vec<i64>) -> Option<Array1<f64>> {
+        if combination.len() != self.columns() {
+            return None
+        }
+        let mut vector = Array1::zeros(self.columns());
+        for (x_i, b_i) in combination.iter().zip(&self.basis) {
+            vector = vector + b_i*(*x_i as f64);
+        }
+        Some(vector)
+    }
+
+    fn index_exists(&self, index: usize) -> bool {
+        if index >= self.columns() {
+            return false
+        }
+        true
+    }
+
+    pub fn get_length_of_basis_vectors(&self) -> usize {
+        self.basis[0].len()
+    }
+
+    pub fn columns(&self) -> usize {
+        self.basis.len()
+    }
+
+    pub fn get_basis_vector(&self, index: usize) -> Option<Array1<f64>> {
+        self.basis.get(index).cloned()
+    }
+
+    pub fn get_gram_schmidt_basis_vector(&self, index: usize) -> Option<Array1<f64>> {
+        self.gram_schmidt_basis.get(index).cloned()
+    }
+
+    pub fn get_shortest_basis_vector(&self) -> Option<Array1<f64>> {
+        if self.columns() == 0 {
+            return None
+        }
+        let mut shortest_basis_vector = self.get_basis_vector(0).expect("Should exist.");
+        let length = shortest_basis_vector.dot(&shortest_basis_vector);
+        for column in self.get_basis_columns(1, self.columns()).expect("Should exist.") {
+            let vector_length = column.dot(&column);
+            if vector_length < length {
+                shortest_basis_vector = column;
+            }
+        }
+        Some(shortest_basis_vector)
+    }
+
+    fn update_basis_vector(&mut self, index: usize, new_vector: &Array1<f64>) -> Result<(), String> {
+        if !self.index_exists(index) {
+            return Err("Index out of range.".to_string())
+        }
+
+        self.basis[index] = new_vector.clone();
+        self.update_gram_schmidt_basis();
+        Ok(())
+    }
+
+    // TODO: Take indexes and update only these to make fewer unnecessary compuations.
+    fn update_gram_schmidt_basis(&mut self) {
+        self.gram_schmidt_basis = gram_schmidt(&self.basis);
+    }
+
+    fn swap_basis_vectors(&mut self, i: usize, j: usize) -> Result<(), String> {
+        if !self.index_exists(i) || !self.index_exists(j) {
+            return Err("Index out of range".to_string())
+        }
+        self.basis.swap(i, j);
+        self.update_gram_schmidt_basis();
+        Ok(())
+    }
+
+    fn get_lattice_points_2d(&self, n: i64) -> Vec<(f64, f64)>{
+        let mut points = Vec::with_capacity(n.pow(2) as usize);
+        for i in -n..n {
+            for j in -n..n {
+                let point = self.get_lattice_point(&vec![i, j]).expect("Function is only run when lattice is 2d").to_vec();
+                points.push((point[0], point[1]));
+            }
+        }
+        points
+    }
+
+    pub fn print_lattice_around_point(&self, point: (f64, f64), plot_size: usize, linear_combinations: i64, extra_points: &Vec<(f64, f64)>) -> Result<(), Box<dyn std::error::Error>> {
+        // if self.columns() != 2 {
+        //     return Err("Not 2d lattice")
+        // }
+
+        let endpoints = plot_size as f64;
+        let points = self.get_lattice_points_2d(linear_combinations);
+
+        let root = SVGBackend::new("images/lattice.svg", (1000, 1000)).into_drawing_area();
+        root.fill(&WHITE)?;
+
+        let mut chart = ChartBuilder::on(&root)
+            .caption("Lattice", ("computer-modern", 30).into_font())
+            .margin(40)
+            .x_label_area_size(30)
+            .y_label_area_size(50)
+            .build_cartesian_2d(-endpoints+point.0..endpoints+point.0, -endpoints+point.1..endpoints+point.1)?;
+
+        chart.configure_mesh()
+            .x_desc("x-axis")
+            .x_label_style(("computer-modern", 12).into_font())
+            .y_desc("y-axis")
+            .y_label_style(("computer-modern", 12).into_font())
+            .draw()?;
+
+        chart
+            .draw_series(PointSeries::of_element(
+                // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+                points,
+                3,
+                &RED,
+                &|c, s, st| {
+                    return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // At this point, the new pixel coordinate is established
+                    // + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
+                },
+            ))?;
+            // .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+        chart
+            .draw_series(PointSeries::of_element(
+                // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+                extra_points.clone(),
+                3,
+                &BLUE,
+                &|c, s, st| {
+                    return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // At this point, the new pixel coordinate is established
+                    // + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
+                },
+            ))?;
+            // .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+        chart
+            .draw_series(PointSeries::of_element(
+                // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+                vec![point],
+                3,
+                &BLACK,
+                &|c, s, st| {
+                    return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // At this point, the new pixel coordinate is established
+                    // + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
+                },
+            ))?;
+            // .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+        root.present()?;
+
+        Ok(())
+    }
+}
+\end{minted}
+
+
+\subsection{\mintinline{bash}{src/lattice/methods.rs}}
+
+\begin{minted}{rust}
+use itertools::Itertools;
+use ndarray::{Array1, Array2};
+use ndarray_linalg::Solve;
+
+use super::Lattice;
+pub mod closest_vector;
+pub mod shortest_vector;
+pub mod basis_reduction;
+pub mod timing;
+
+// We expect this function to be called only with vectors of the same size.
+pub fn make_matrix_from_column_vectors(vectors: &Vec<Array1<f64>>) -> Array2<f64> {
+    let columns = vectors.len();
+    let rows = vectors[0].shape()[0].clone();
+    let flattened = vectors.into_iter().flatten().cloned().collect();
+
+    Array2::from_shape_vec((columns, rows), flattened).unwrap().reversed_axes()
+}
+
+// TODO make sure this is a basis and not just a span of some vectors.
+// For the moment we use only full rank lattices as a workaround.
+pub fn make_into_basis_matrix(vectors: &Vec<Array1<f64>>) -> Result<Array2<f64>, String> {
+    if !vectors.iter().map(|v| v.len()).all_equal() {
+        return Err("All basis vectors are not of the same length.".to_string())
+    }
+    Ok(make_matrix_from_column_vectors(vectors))
+}
+
+// Workaround to ensure vectors are linearly independent.
+// TODO: Make this more effective.
+pub fn is_linearly_independent(vectors: &Vec<Array1<f64>>) -> bool {
+    if let Ok(matrix) = make_into_basis_matrix(vectors) {
+        let zero = Array1::zeros(matrix.shape()[0]);
+        if let Err(_) = matrix.solve(&zero) {
+            false
+        } else {
+            true
+        }
+    } else {
+        false
+    }
+}
+
+// Uses the Gram-Schmidt algorithm, which gives an orthogonal set {v_1, ..., v_t} to a set {u_1, ..., u_t}
+// where
+//   u_i = v_i - sum_{j=1,...,i-1}( <u_j, v_i> (v_i) )
+pub fn gram_schmidt(vectors: &Vec<Array1<f64>>) -> Vec<Array1<f64>> {
+    let mut orthogonal = Vec::with_capacity(vectors.len());
+    for i in 0..vectors.len() {
+        let u = vectors.get(i).expect("Index should exists");
+        let mut v = u.clone();
+        for j in 0..i {
+            let u_j: &Array1<f64> = orthogonal.get(j).expect("Index should exists");
+            let scalar = u.dot(u_j)/u_j.dot(u_j);
+            let diff = u_j*scalar;
+
+            v = v - diff;
+        }
+        orthogonal.push(v.clone());
+    }
+    orthogonal
+}
+
+
+fn collect_columns_in_vec(matrix: &Array2<f64>) -> Vec<Array1<f64>> {
+    let mut vec: Vec<Array1<f64>> = Vec::with_capacity(matrix.rows().into_iter().len());
+    
+    matrix.map_axis(ndarray::Axis(0), |v| 
+        vec.push(Array1::from_vec(v.to_vec()))
+    );
+
+    vec
+}
+
+
+pub fn gram_schmidt_columns(matrix: &Array2<f64>) -> Array2<f64> {
+    let vec = collect_columns_in_vec(matrix);
+    make_matrix_from_column_vectors(&gram_schmidt(&vec))
+}
+
+
+pub fn get_length_of_vector(vector: &Array1<f64>) -> f64 {
+    vector.dot(vector)
+}
+
+
+impl Lattice {
+    // Calculates mu_kj = <b_k, b*_j>/<b*_j, b*_j>
+    fn get_mu(&self, k: usize, j: usize) -> f64 {
+        let b_k = self.get_basis_vector(k).expect("Should exist.");
+        let b_orth_j = self.get_gram_schmidt_basis_vector(j).expect("Should exist.");
+        b_k.dot(&b_orth_j)/(b_orth_j.dot(&b_orth_j))
+    }
+
+    fn get_gram_schmidt_length(&self, index: usize) -> f64 {
+        let b = self.get_gram_schmidt_basis_vector(index).expect("Should exist");
+        b.dot(&b)
+    }
+
+    fn write_vector_with_gram_schmidt_vectors(&self, vector: &Array1<f64>) -> Array1<f64> {
+        let gram_schmidt_matrix = make_into_basis_matrix(&self.gram_schmidt_basis).expect("Gram-Schmidt basis should be a square matrix.");
+        gram_schmidt_matrix.solve(vector).expect("Gram-Schmidt matrix is of full rank.")
+    }
+
+    fn write_vector_with_basis_vectors(&self, vector: &Array1<f64>) -> Array1<f64> {
+        let basis_matrix = make_into_basis_matrix(&self.basis).expect("Basis matrix should be a square matrix.");
+        basis_matrix.solve(&vector).expect("Basis matrix is of full rank.")
+    }
+}
+
+
+#[cfg(test)]
+mod lattice_tests {
+    use rand::{thread_rng, Rng};
+    use ndarray::array;
+
+    use super::*;
+    use super::timing::{generate_random_basis, generate_random_vector};
+
+    #[test]
+    fn test_matrix_from_column_vectors() {
+        let vectors = vec![array![1.,2.,3.], array![4.,5.,6.], array![7.,8.,9.]];
+        let matrix = array![
+            [1.,4.,7.],
+            [2.,5.,8.],
+            [3.,6.,9.],
+        ];
+        let made_matrix = make_matrix_from_column_vectors(&vectors);
+        let made_vectors = collect_columns_in_vec(&matrix);
+        assert_eq!(made_matrix, matrix);
+        assert_eq!(made_vectors, vectors);
+    }
+
+    #[test]
+    #[allow(unused_must_use)]
+    fn test_lattice_building() {
+        let vectors = vec![array![1.,2.,3.], array![4.,5.,6.], array![7.,8.,8.]];
+
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&vectors).unwrap();
+        let shortest_vector = array![1.,2.,3.];
+
+        assert_eq!(lattice.get_shortest_basis_vector().unwrap(), shortest_vector.view());
+
+        let combination = vec![4, 6, -2];
+
+        assert_eq!(lattice.get_lattice_point(&combination).unwrap(), array![14., 22., 32.]);
+
+        let new_vectors = vec![
+            array![7.,8.,8.],
+            array![4.,5.,6.]
+        ];
+        
+        lattice.swap_basis_vectors(1, 2);
+        assert_eq!(lattice.get_basis_columns(1, 3).unwrap(), new_vectors);
+
+        lattice.update_basis_vector(2, &shortest_vector);
+        assert_eq!(lattice.get_basis_vector(2).unwrap(), shortest_vector);
+    }
+
+    #[test]
+    fn test_simple_lattice_operations() {
+        let mut rng = thread_rng();
+        let dimension = rng.gen_range(2..14);
+        let basis = generate_random_basis(dimension);
+        let lattice = Lattice::build_lattice_basis_from_vectors(&basis).unwrap();
+
+        let index = rng.gen_range(0..dimension);
+        let column = lattice.get_basis_vector(index).unwrap();
+        let correct_column = basis.get(index).unwrap();
+
+        assert_eq!(column, correct_column);
+        assert_eq!(lattice.get_length_of_basis_vectors(), dimension);
+        assert_eq!(lattice.columns(), dimension);
+        assert!(lattice.index_exists(dimension-1));
+        assert!(!lattice.index_exists(dimension));
+    }
+
+    #[test]
+    fn test_gram_schmidt() {
+        let dimension = 100;
+        let tol = 1e-9;
+        let basis = generate_random_basis(dimension);
+        let b = gram_schmidt(&basis);
+        
+        for i in 0..7 {
+            let b_i = b.get(i).unwrap();
+            for j in i+1..7 {
+                let b_j = b.get(j).unwrap();
+                let ip = b_i.dot(b_j);
+                assert!(ip.abs() < tol, "ip = {}, between index {}, and {}", ip, i, j);
+            }
+        }
+    }
+
+    #[test]
+    #[allow(unused_must_use)]
+    fn problem_solvers_runs_without_crashing() {
+        let dimension = 5;
+        let basis = generate_random_basis(dimension);
+        let vector = generate_random_vector(dimension, 1.);
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).unwrap();
+
+        let delta = 0.75;
+        lattice.lll_reduction(delta);
+
+        lattice.shortest_vector_by_enumeration();
+        lattice.babai_nearest_plane(&vector);
+        lattice.closest_vector_by_enumeration(&vector);
+    }
+
+    #[test]
+    fn test_linearly_independent() {
+        let mut vectors = vec![
+            array![1., 4., 7.],
+            array![2., 5., 8.],
+            array![3., 6., 9.]
+        ];
+
+        assert!(!is_linearly_independent(&vectors));
+
+        vectors[2] = array![3., 6., 8.];
+        assert!(is_linearly_independent(&vectors));
+
+        vectors[1] = array![1., 5.];
+        assert!(!is_linearly_independent(&vectors));
+    }
+
+    #[test]
+    fn test_cvp_by_enumeration() {
+        let rng = thread_rng();
+        let dimension = 15;
+        let loops = 20;
+        let basis = generate_random_basis(dimension);
+        let vector = generate_random_vector(dimension, 1.);
+
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).unwrap();
+        lattice.lll_reduction(0.75);
+
+        for _ in 0..loops {
+            let cvp_enumeration = lattice.closest_vector_by_enumeration(&vector).unwrap();
+            let cvp_babai = lattice.babai_nearest_plane(&vector).unwrap();
+
+            let len_enum = get_length_of_vector(&(&cvp_enumeration - &vector));
+            let len_babai = get_length_of_vector(&(&cvp_babai - &vector));
+
+            if len_enum > len_babai {
+                panic!("Enumeration did not find the closest vector.");
+            }
+        }
+    }
+}
+\end{minted}
+
+
+\subsection{\mintinline{bash}{src/lattice/methods/closest_vector.rs}}
+
+\begin{minted}{rust}
+use crate::lattice::Lattice;
+use ndarray::Array1;
+
+use super::get_length_of_vector;
+
+impl Lattice {
+    pub fn babai_nearest_plane(&self, vector: &Array1<f64>) -> Result<Array1<f64>, String> {
+        let rows = self.get_length_of_basis_vectors();
+        if rows != vector.len() {
+            return Err("Vector size not compatible with lattice".to_string())
+        }
+
+        let dim = self.columns();
+        if dim == 0 {
+            return Err("Lattice is empty.".to_string())
+        }
+        let mut w = vector.clone();
+        let mut y = Array1::zeros(rows);
+
+        for i in (0..dim).into_iter().rev() {
+            let gs_i = self.get_gram_schmidt_basis_vector(i).expect("Vector should exist.");
+            let b_i = self.get_basis_vector(i).expect("Vector should exist.");
+            let l_i = &w.dot(&gs_i)/gs_i.dot(&gs_i);
+            let l_i_rounded = l_i.round();
+
+            y = y + &b_i*l_i_rounded;
+
+            w = w - gs_i*(l_i - l_i_rounded) - b_i*l_i_rounded;
+        }
+
+        Ok(y)
+    }
+
+    pub fn closest_vector_by_enumeration(&self, vector: &Array1<f64>) -> Result<Array1<f64>, String> {
+        if self.columns() == 0 {
+            return Err("Lattice is empty.".to_string())
+        }
+
+        let y = self.write_vector_with_gram_schmidt_vectors(vector);
+        let mut closest_vector = self.get_basis_vector(0).expect("Should exist.");
+        let mut shortest_distance = get_length_of_vector(&(vector-&closest_vector));
+
+        let mut combination = vec![0; self.columns()];
+        let (lower_bound, upper_bound) = self.get_cvp_enumeration_bounds(&combination, 0, shortest_distance, &y);
+
+        for x_n in lower_bound..=upper_bound {
+            combination[self.columns()-1] = x_n;
+            let (candidate_vector, candidate_distance) = self.closest_vector_enumeration_step(vector, 1, &mut combination, &closest_vector, shortest_distance, &y);
+            if candidate_distance < shortest_distance {
+                closest_vector = candidate_vector;
+                shortest_distance = candidate_distance;
+            }
+        }
+
+        Ok(closest_vector)
+    }
+
+    fn closest_vector_enumeration_step(&self, vector: &Array1<f64>, depth: usize, combination: &mut Vec<i64>, current_closest_vector: &Array1<f64>, current_shortest_distance: f64, y: &Array1<f64>) -> (Array1<f64>, f64) {
+        if depth == self.columns() {
+            let current_vector = self.get_lattice_point(combination).expect("Should exist.");
+            let current_distance = get_length_of_vector(&(vector-&current_vector));
+            // println!("Found current distance: {}, with {}", current_distance, current_vector);
+            return (current_vector, current_distance)
+        }
+        
+        let mut closest_vector = current_closest_vector.clone();
+        let mut shortest_distance = current_shortest_distance;
+        let (lower_bound, upper_bound) = self.get_cvp_enumeration_bounds(combination, depth, shortest_distance, y);
+
+        for i in lower_bound..=upper_bound {
+            // let mut new_combination = combination.clone();
+            // new_combination.push(i);
+            combination[self.columns()-1-depth] = i;
+            let (candidate_vector, candidate_distance) = self.closest_vector_enumeration_step(vector, depth+1, combination, &closest_vector, shortest_distance, y);
+            if candidate_distance < shortest_distance {
+                closest_vector = candidate_vector;
+                shortest_distance = candidate_distance;
+                // println!("New shortest distance found: {}, with {}", shortest_distance, closest_vector);
+            }            
+        }
+
+        (closest_vector, shortest_distance)
+    }
+
+    #[allow(non_snake_case)]
+    fn get_cvp_enumeration_bounds(&self, combination: &Vec<i64>, basis_number: usize, A: f64, y: &Array1<f64>) -> (i64, i64) {
+        let mut sum = 0.;
+        let mut N_i = 0.;
+        let start = self.columns()-basis_number;
+        let end = self.columns();
+        let i = self.columns()-basis_number-1;
+        // let z = self.write_vector_with_gram_schmidt_vectors_from_reversed_basis_representation(combination);
+        for j in (start..end).into_iter().rev() {
+            let B_j = self.get_gram_schmidt_length(j);
+            let mu_ji = self.get_mu(j, i);
+            sum += ((self.get_gram_schmidt_coefficient(&combination, j) - y.get(j).expect("Should exist.")).powf(2.) as f64)*B_j;
+            N_i += mu_ji * (combination[j] as f64);
+        }
+        let M_i = ((A - sum)/self.get_gram_schmidt_length(i)).sqrt();
+        let y_i = y.get(i).expect("Should exist.");
+        // println!("We have y_i = {}", y_i);
+
+        (
+            (y_i - M_i - N_i).ceil() as i64,
+            (y_i + M_i - N_i).floor() as i64
+        )
+    }
+
+    // This help function is only for get_cvp_enumeration_bounds(...), and will therefore be
+    // written to work with this, and not for general purpose.
+    pub fn get_gram_schmidt_coefficient(&self, combination: &Vec<i64>, i: usize) -> f64 {
+        // let num_of_zeros = self.columns()-combination.len();
+        // let comb = combination.iter().copied().chain(vec![0; num_of_zeros].iter().copied()).rev().collect();
+        // let vector = self.get_lattice_point(&comb).expect("Combination should be valid.");
+
+        let mut z_i = combination[i] as f64;
+        for j in i+1..self.columns() {
+            z_i += (combination[j] as f64)*self.get_mu(j, i);
+        }
+
+        z_i
+    }
+}
+\end{minted}
+
+
+\subsection{\mintinline{bash}{src/lattice/methods/shortest_vector.rs}}
+
+\begin{minted}{rust}
+use crate::lattice::Lattice;
+use ndarray::Array1;
+
+impl Lattice {
+    // Say v = sum_{i=1}^{n} x_j b_j, is the shortest vector. We use that
+    //   -(M_1 + M_2) =< x_i => M_1 - M_2
+    // where
+    //   M_1 = sqrt{ ( A - sum_{j = i+1}^{n} x_j^2 B_j )/B_i }
+    //   M_2 = sum_{j = i+1}^{n} µ_{j,i} x_j
+    // with A > ||v||^2 and B_j = ||b_j||^2 and µ_{j,i} = <b_i, b*_j>/||b*_j||^2.
+    pub fn shortest_vector_by_enumeration(&self) -> Result<Array1<f64>, String> {
+        if self.columns() == 0 {
+            return Err("Lattice is empty.".to_string())
+        }
+        let mut shortest_vector: Array1<f64> = self.get_basis_vector(self.columns()-1).expect("Should exist.").to_vec().into();
+        let mut shortest_length = shortest_vector.dot(&shortest_vector);
+
+        let mut combination = vec![0; self.columns()];
+        let bound_n = (shortest_length/self.get_gram_schmidt_length(self.columns()-1)).sqrt().floor() as i64;
+
+
+        for x_n in 0..bound_n {
+            combination[self.columns()-1] = x_n;
+            let (candidate_vector, candidate_length) = self.shortest_vector_enumeration_steps(1, &mut combination, &shortest_vector.to_vec().into(), shortest_length);
+            if candidate_length < shortest_length && candidate_length != 0. {
+                shortest_vector = candidate_vector;
+                shortest_length = candidate_length;
+            }
+        }
+
+        Ok(shortest_vector)
+    }
+
+    fn shortest_vector_enumeration_steps(&self, depth: usize, combination: &mut Vec<i64>, current_shortes_vector: &Array1<f64>, current_shortest_length: f64) -> (Array1<f64>, f64) {
+        if depth == self.columns() {
+            let current_vector = self.get_lattice_point(combination).expect("Should exist.");
+            let current_length = current_vector.dot(&current_vector);
+            return (current_vector, current_length)
+        }
+
+        let mut shortest_vector = current_shortes_vector.clone();
+        let mut shortest_length = current_shortest_length;
+        let (lower_bound, upper_bound) = self.get_svp_enumeration_bounds(combination, depth, shortest_length);
+        for i in lower_bound..=upper_bound {
+            combination[self.columns()-1-depth] = i;
+            let (candidate_vector, candidate_length) = self.shortest_vector_enumeration_steps(depth+1, combination, &shortest_vector, shortest_length);
+            if candidate_length < shortest_length && candidate_length != 0. {
+                shortest_vector = candidate_vector;
+                shortest_length = candidate_length;
+            }
+        }
+
+        (shortest_vector, shortest_length)
+    }
+
+    #[allow(non_snake_case)]
+    fn get_svp_enumeration_bounds(&self, combination: &Vec<i64>, basis_number: usize, A: f64) -> (i64, i64) {
+        let mut sum: f64 = 0.;
+        let mut M_2: f64 = 0.;
+        let start = self.columns()-basis_number+1;
+        let end = self.columns();
+        let i = self.columns()-basis_number;
+        for j in (start..end).into_iter().rev() {
+            let B_j = self.get_gram_schmidt_length(j);
+            let mu_ji = self.get_mu(j, i);
+            sum += (combination[j].pow(2) as f64)*B_j;
+            M_2 += mu_ji*(combination[j] as f64);
+        }
+        let M_1 = ((A-sum)/self.get_gram_schmidt_length(i)).sqrt();
+
+        (-(M_1+M_2).ceil() as i64, (M_1-M_2).floor() as i64)
+    }
+}
+\end{minted}
+
+
+\subsection{\mintinline{bash}{src/lattice/methods/basis_reduction.rs}}
+
+\begin{minted}{rust}
+use ndarray_linalg::Scalar;
+
+use crate::lattice::Lattice;
+use std::cmp::max;
+
+impl Lattice {
+    // This procedure is directly copied from Galbraith
+    //   https://www.math.auckland.ac.nz/~sgal018/crypto-book/ch17.pdf
+    pub fn lll_reduction(&mut self, delta: f64) -> Result<(), String> {
+        if delta >= 1. || delta <= 0.25 {
+            return Err("Given delta is out of the allowed range (1/4, 1)".to_string())
+        }
+        let mut k = 1;
+        while k < self.columns() {
+            for j in (0..k).rev() {
+                let b_k = self.get_basis_vector(k).expect("Should exist.");
+
+                let mu_kj = self.get_mu(k, j);
+                if mu_kj.abs() > 0.5 {
+                    let b_j = self.get_basis_vector(j).expect("Should exist.");
+                    let new_bk = &b_k - &b_j*(mu_kj.round());
+                    if let Err(e) = self.update_basis_vector(k, &new_bk) {
+                        return Err(e)
+                    }
+                }
+            }
+            if self.get_gram_schmidt_length(k) > (delta - self.get_mu(k, k-1).powi(2))*self.get_gram_schmidt_length(k-1) {
+                k += 1;
+            } else {
+                if let Err(e) = self.swap_basis_vectors(k, k-1) {
+                    return Err(e)
+                }
+                k = max(1, k-1);
+            }
+        }
+        Ok(())
+    }
+}
+\end{minted}
+
+
+\subsection{\mintinline{bash}{src/lattice/methods/timing.rs}}
+
+\begin{minted}{rust}
+use std::time::Instant;
+
+use plotters::style::full_palette::{BLUE, GREEN, ORANGE};
+use plotters::prelude::*;
+use ndarray::{array, Array1, Axis};
+use rand::{thread_rng, Rng};
+use crate::lattice::{methods::get_length_of_vector, Lattice};
+
+use super::is_linearly_independent;
+
+pub fn generate_random_basis(dimension: usize) -> Vec<Array1<f64>> {
+    let mut basis: Vec<Array1<f64>> = Vec::with_capacity(dimension);
+    for _ in 0..dimension {
+        basis.push(generate_random_vector(dimension, 1.));
+    }
+
+    while !is_linearly_independent(&basis) {
+        for i in 0..dimension {
+            basis[i] = generate_random_vector(dimension, 1.);
+        }
+    }
+    basis
+}
+
+pub fn generate_random_vector(dimension: usize, scaling: f64) -> Array1<f64> {
+    let mut rng = thread_rng();
+    let mut vector: Array1<f64> = Array1::zeros(dimension);
+    vector.map_inplace(|e| {*e = scaling*(rng.gen_range(-1000..1000) as f64)});
+    vector
+}
+
+
+pub fn cvp_statistics(top: usize) {
+    for dimension in 2..top {
+        println!("For dimension {}, we found the following:", dimension);
+        
+        let scale = 20.;
+        let basis = generate_random_basis(dimension);
+        let vector = generate_random_vector(dimension, scale);
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).expect("Basis is square.");
+        
+        let babai_pre_lll = lattice.babai_nearest_plane(&vector).expect("Should be well-defined.");
+        let babai_pre_lll_distance = get_length_of_vector(&(&vector - &babai_pre_lll));
+
+        let delta = 0.75;
+        lattice.lll_reduction(delta);
+        let babai_post_lll = lattice.babai_nearest_plane(&vector).expect("Should be well-defined.");
+        let babai_post_lll_distance = get_length_of_vector(&(&vector - &babai_post_lll));
+
+        let closest_vector = lattice.closest_vector_by_enumeration(&vector).expect("Should be well-defined.");
+        let closest_vector_distance = get_length_of_vector(&(&vector - &closest_vector));
+
+        let shortest_vector = lattice.shortest_vector_by_enumeration().expect("Should be well-defined.");
+        let shortest_vector_distance = get_length_of_vector(&shortest_vector);
+
+        let shortest_basis_vector = lattice.get_basis_vector(0).expect("Should exist.");
+        let shortest_basis_vector_distance = get_length_of_vector(&shortest_basis_vector);
+
+        println!("distance for babai_pre_lll:          {}", babai_pre_lll_distance);
+        println!("distance for babai_post_lll:         {}", babai_post_lll_distance);
+        println!("distance for closest_vector:         {}", closest_vector_distance);
+        println!("distance for shortest_vector:        {}", shortest_vector_distance);
+        println!("distance for shortest_basis_vector:  {}", shortest_basis_vector_distance);
+        println!();
+    }
+}
+
+
+pub fn increase_basis(basis: &mut Vec<Array1<f64>>) {
+    let mut rng = thread_rng();
+    for vector in basis.iter_mut() {
+        let append = rng.gen_range(-1000..1000) as f64;
+        vector.append(Axis(0), array![append].view());
+    }
+    let dimension = basis[0].len();
+    basis.push(generate_random_vector(dimension, 1.));
+    while !is_linearly_independent(&basis) {
+        basis[dimension-1] = generate_random_vector(dimension, 1.);
+    }
+}
+
+
+pub fn plot_shortest_vector(start: usize, end: usize) {
+    let mut shortest = Vec::with_capacity(end-start);
+    let mut length = Vec::with_capacity(end-start);
+
+    let mut basis = generate_random_basis(start);
+    let mut max_y = 0 as u64;
+    let min_x = (start-1) as u64;
+    let max_x = end as u64;
+
+    for dimension in start..end {
+        let vector = generate_random_vector(dimension, 20.);
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).expect("Should be a square matrix.");
+
+        lattice.lll_reduction(0.75);
+
+        let shortest_vector = lattice.shortest_vector_by_enumeration().unwrap();
+        let shortest_length = get_length_of_vector(&shortest_vector).round() as u64;
+        shortest.push((dimension as u64, shortest_length));
+
+        let shortest_basis = lattice.get_shortest_basis_vector().unwrap();
+        let shortest_length = get_length_of_vector(&shortest_basis).round() as u64;
+        if shortest_length > max_y {
+            max_y = shortest_length;
+        }
+        length.push((dimension as u64, shortest_length));
+
+        increase_basis(&mut basis);
+    }
+
+    let times = vec![
+        (shortest, "Shortest vector"),
+        (length, "Shortest basis vector after LLL-reduction"),
+    ];
+
+    plot_time(times, "Length of shortest vector", (min_x, max_x, 1 as u64, max_y), "svp-length", "Length");
+}
+
+pub fn plot_distance_diffs(start: usize, end: usize) {
+    let mut dist_babai_pre_lll = Vec::with_capacity(end-start);
+    let mut dist_babai_post_lll = Vec::with_capacity(end-start);
+    let mut dist_cvp_enum = Vec::with_capacity(end-start);
+    let mut basis = generate_random_basis(start);
+    let mut max_y = 0 as u64;
+    let max_x = end as u64;
+    let min_x = (start-1) as u64;
+
+    for dimension in start..end {
+        let vector = generate_random_vector(dimension, 20.);
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).expect("Should be a square matrix.");
+
+        let babai_pre_lll = lattice.babai_nearest_plane(&vector).unwrap();
+        let dist_pre_lll = get_length_of_vector(&(&vector-babai_pre_lll)).round() as u64;
+        if dist_pre_lll > max_y {
+            max_y = dist_pre_lll;
+        }
+        dist_babai_pre_lll.push((dimension as u64, dist_pre_lll));
+
+        lattice.lll_reduction(0.75);
+
+        let babai_post_lll = lattice.babai_nearest_plane(&vector).unwrap();
+        let dist_post_lll = get_length_of_vector(&(&vector-babai_post_lll)).round() as u64;
+        if dist_post_lll > max_y {
+            max_y = dist_post_lll;
+        }
+        dist_babai_post_lll.push((dimension as u64, dist_post_lll));
+
+        let cvp_enum = lattice.closest_vector_by_enumeration(&vector).unwrap();
+        let dist_cvp = get_length_of_vector(&(&vector-cvp_enum)).round() as u64;
+        dist_cvp_enum.push((dimension as u64, dist_cvp));
+
+        increase_basis(&mut basis);
+    }
+
+    let times = vec![
+        (dist_babai_pre_lll, "Babai before LLL-reduction"),
+        (dist_babai_post_lll, "Babai after LLL-reduction"),
+        (dist_cvp_enum, "Closest vector"),
+    ];
+
+    plot_time(times, "Closest Vector Problem with different methods", (min_x, max_x, 1, max_y), "cvp-distance", "Distance");
+}
+
+
+pub fn enumeration_times_with_lll(start: usize,top: usize) {
+    let mut cvp_times_pre_lll = Vec::with_capacity(top-start);
+    let mut cvp_times_post_lll = Vec::with_capacity(top-start);
+    let mut svp_times_pre_lll = Vec::with_capacity(top-start);
+    let mut svp_times_post_lll = Vec::with_capacity(top-start);
+    let mut basis = generate_random_basis(start);
+    let mut max_y = 0 as u64;
+    let max_x = top as u64;
+    let min_x = (start-1) as u64;
+    for dimension in start..top {
+        let vector = generate_random_vector(dimension, 20.);
+        let index = dimension - 2;
+        let loops = vec![15, 15, 15, 15, 10, 10, 10, 5, 5, 3, 3, 2, 2, 2];
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).expect("Should be a square matrix.");
+
+        let mut loop_num = 1;
+        if loops.len() > index {
+            loop_num = loops[index];
+        }
+
+        let now = Instant::now();
+        for _ in 0..loop_num {
+            lattice.closest_vector_by_enumeration(&vector);
+        }
+        let elapsed = (now.elapsed()/loop_num as u32).as_millis() as u64;
+        if elapsed > max_y {
+            max_y = elapsed;
+        }
+        cvp_times_pre_lll.push((dimension as u64, elapsed));
+
+        for _ in 0..loop_num {
+            lattice.shortest_vector_by_enumeration();
+        }
+        let elapsed = (now.elapsed()/loop_num as u32).as_millis() as u64;
+        if elapsed > max_y {
+            max_y = elapsed;
+        }
+        svp_times_pre_lll.push((dimension as u64, elapsed));
+
+
+        lattice.lll_reduction(0.75);
+
+        let now = Instant::now();
+        for _ in 0..loop_num {
+            lattice.closest_vector_by_enumeration(&vector);
+        }
+        let elapsed = (now.elapsed()/loop_num as u32).as_millis() as u64;
+        if elapsed > max_y {
+            max_y = elapsed;
+        }
+        cvp_times_post_lll.push((dimension as u64, elapsed));
+
+        let now = Instant::now();
+        for _ in 0..loop_num {
+            lattice.shortest_vector_by_enumeration();
+        }
+        let elapsed = (now.elapsed()/loop_num as u32).as_millis() as u64;
+        if elapsed > max_y {
+            max_y = elapsed;
+        }
+        svp_times_post_lll.push((dimension as u64, elapsed));
+
+        increase_basis(&mut basis);
+    }
+
+    let times = vec![
+        (cvp_times_pre_lll, "CVP before LLL-reduction"),
+        (cvp_times_post_lll, "CVP after LLL-reduction"),
+        (svp_times_pre_lll, "SVP before LLL-reduction"),
+        (svp_times_post_lll, "SVP after LLL-reduction"),
+    ];
+
+    plot_time(times, "Timing of Enumeration Methods", (min_x, max_x, 1, max_y), "enumeration-lll", "Milliseconds");
+}
+
+
+fn plot_time(times: Vec<(Vec<(u64, u64)>, &str)>, caption: &str, range: (u64, u64, u64, u64), filename: &str, y_label: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let file: String = "images/".to_string() + filename + ".svg";
+
+    let root = SVGBackend::new(&file, (1200, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let palette = [
+        BLACK,
+        ORANGE,
+        BLUE,
+        GREEN,
+    ];
+
+    // let y = (1..max_y).log_scale();
+    let x = range.0..range.1;
+    let y = range.2..range.3;
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption(caption.to_string(), ("computer-modern", 50).into_font())
+        .margin(40)
+        .x_label_area_size(50)
+        .y_label_area_size(80)
+        .build_cartesian_2d(x, y)?;
+        // .build_cartesian_2d(1..top, (min_y..max_y).log_scale())?;
+
+    chart.configure_mesh()
+        .x_desc("Dimension of lattice")
+        .x_label_style(("computer-modern", 24).into_font())
+        .y_desc(y_label)
+        .y_label_formatter(&|y| format!("{0:.1$e}", y, 1))
+        .y_label_style(("computer-modern", 24).into_font())
+        .draw()?;
+
+    for (i, (t, label)) in times.iter().enumerate() {
+        let color = palette.get(i).expect("Should exist.");
+        chart
+            .draw_series(LineSeries::new(
+                // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+                t.clone(),
+                &color,
+            ))?;
+        chart
+            .draw_series(PointSeries::of_element(
+                // (-50..=50).map(|x| x as f32 / 50.0).map(|x| (x, x * x)),
+                t.clone(),
+                3,
+                &color,
+                &|c, s, st| {
+                    return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // At this point, the new pixel coordinate is established
+                    // + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
+                },
+            ))?
+            .label(label.to_string())
+            // .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+            .legend(move |(x, y)| Circle::new((x, y), 3, color.filled()));
+    }
+
+    chart
+        .configure_series_labels()
+        .position(SeriesLabelPosition::UpperLeft)
+        .label_font(("computer-modern", 24).into_font())
+        .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
+        .legend_area_size(12)
+        .draw()?;
+
+    root.present()?;
+
+    Ok(())
+}
+
+
+pub fn check_closest_vector_by_enumeration_limit() {
+    let now = Instant::now();
+    let mut dimension = 30;
+    let mut basis = generate_random_basis(dimension);     
+
+    loop {
+        let vector = generate_random_vector(dimension, 20.);
+        let mut lattice = Lattice::build_lattice_basis_from_vectors(&basis).expect("Should be a square matrix.");
+        lattice.lll_reduction(0.75);
+        
+        let cvp = match lattice.closest_vector_by_enumeration(&vector) {
+            Err(err) => println!("Error in dimension {}, Err: {}", dimension, err),
+            Ok(_) => println!("Finished cvp for dimension {}, after {} seconds", dimension, now.elapsed().as_secs()),
+        };
+
+        dimension += 1;        
+        increase_basis(&mut basis);
+    }
+}
+\end{minted}
+
+
+\subsection{\mintinline{bash}{cargo.toml}}
+
+\begin{minted}{toml}
+[package]
+name = "beralg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+itertools = "0.14.0"
+ndarray = "0.16.1"
+ndarray-linalg = { version = "0.17.0", features = ["openblas"] }
+openblas-src = "0.10.11"
+plotters = "0.3.7"
+rand = "0.8.5"
+rug = "1.26.1"
+
+[profile.release]
+panic = 'abort'
+\end{minted}

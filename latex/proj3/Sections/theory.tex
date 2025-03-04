@@ -1,0 +1,350 @@
+\section{Shortest Vector Problem}
+
+  \begin{problem}[Shortest Vector Problem]
+    \label{pb:svp}
+    Let $\Lambda$ be a lattice. We want to find the point $v \in \Lambda \setminus \cbrack{ 0 } $ such that $||v||^2$ is minimal.
+  \end{problem}
+
+  We will for this project only consider lattices of full rank.
+  So we take some lattice $\Lambda \in \M{R}^n$ and a basis $\mathcal{B} = \cbrack{ b_1, \dots, b_n }$, and let $\mathcal{B}^* = \cbrack{ b_1^*, \dots, b_n^* }$ to be the Gram-Schmidt orthogonalization.
+  We will also throughout this project use $B_i = ||b_i^*||^2$ and $\mu_{j,i} = \abrack{b_j, b_i^*}/B_i$.
+
+\subsection{Enumeration Method} \label{sec:svp-enum}
+
+\subsubsection{Theory}
+
+
+  Our aim will be to enumerate all vector $v \in \Lambda$ such that $\llbrack{v}^2 \leq A$ for some $A$.
+  If $A$ is chosen so that such vectors exists, then we will certainly find the shortest vector, as it has length less than $A$.
+  Let $v\in \Lambda$ be a such vector.
+  We write
+
+  \begin{equation}
+    v = \sum_{i=1}^{n} x_i b_i = \sum_{i=1}^{n} z_i b_i^*.
+    \label{eq:v-representation}
+  \end{equation}
+
+  Since all $b_i^*$ are orthogonal we have
+
+  \begin{equation}
+    ||v||^2 = \left\| \sum_{i=1}^{n} z_i b_i^* \right\|^2 = \sum_{i=1}^{n} z_i^2 B_i.
+    \label{eq:v-length}
+  \end{equation}
+
+  Furthermore we can express $z_i$ by only using $x_j$ for $j \geq i$, 
+
+  \begin{equation}
+    z_i = x_i + \sum_{j=i+1}^{n} \mu_{j,i} x_j.
+  \end{equation}
+
+  This combined with $\llbrack{v}^2 \leq A$ gives us
+
+  \begin{equation}
+    \nbrack{ x_i + \sum_{j=i+1}^{n} \mu_{j,i} x_j }^2 B_i \leq A - \sum_{j=i+1}^{n} z_j^2 B_j. 
+    \label{eq:bounds-i}
+  \end{equation}
+  
+  We can from this take a square root, and do some manipulation to end up with the following result.
+
+  \begin{theorem}
+    Let $v = \sum_{i=0}^{n} x_i b_i$ be such that $||v||^2 < A$.
+    Then we have the bounds
+
+    \begin{equation}
+      \label{eq:n-bounds}
+      0 \leq x_n \leq \sqrt{\frac{A}{B_n}}
+    \end{equation}
+
+    and for $i = 1,2,...,n-1$ we get
+
+    \begin{equation}
+      \label{eq:i-bounds}
+      -(M_i + N_i) \leq x_i \leq M_i - N_i
+    \end{equation}
+
+    where
+
+    \begin{equation}
+      M_i = \sqrt{ \nbrack{ A - \sum_{j=i+1}^{n} x_j^2 B_j } / B_i }, \quad
+      N_i = \sum_{j=i+1}^{n} \mu_{j,i} x_j
+    \end{equation}
+    
+  \end{theorem}
+  
+  One can note that $x_n$ does not have two-sided bounds.
+  This is because if $v$ is a shortest vector, then clearly $-v$ is as well.
+  Because of this we can choose the coefficient $x_n$ to be positive.
+
+
+\subsubsection{Implementation}
+
+  We will now create an algorithm based on our previous discussion.
+  Because we are iterating through coefficients iteratively, we will use recursion where we keep track of the current depth, and then return when reaching the desired depth.
+  We therefore create an algorithm for each step and one for the whole method.
+  This leads us to \cref{alg:svp-enumeration-step}, and \cref{alg:svp}.
+
+  Note that in these algorithms $M_i$ depends on some $A$.
+  We will update this $A$ to be such that $A = ||v||^2$ where $v$ is the current shortest vector found.
+  This will narrow the range to test each time we find a shorter vector.
+  We also assume that we have the Gram-Schmidt basis as well.
+
+  Finding the time complexity of \cref{alg:svp} is non-trivial, and is therefore not done here.
+  We will rather outsource it to literature where one for example can find that the shortest vector can be computed with at most
+
+  \begin{equation}
+    p\nbrack{ \log (B), m } n^{n/2e+\O (n)}
+    \label{eq:svp-enum-complexity}
+  \end{equation}
+  bit operations, where $p(x, y) \in \M{R}\bbrack{ x,y }$ is a polynomial (\cite{galbraith}).
+
+
+  \begin{algorithm}
+    \caption{SVP Enumeration Step}
+    \label{alg:svp-enumeration-step}
+    \textbf{Input:} $\mathcal{B}$ a basis of the lattice $\Lambda$, the current depth $D$, $\cbrack{x_n, \dots, x_{i+1}}$ for $i\in \cbrack{n-1, \dots, 1}$, $v$ the current shortest checked vector. \\
+    \textbf{Output:} $v \in \Lambda$ the shortest vector found deeper. \\
+    \begin{algorithmic}[1]
+      \If{$D = n$}
+        \Return $\sum_{i=1}^{n} x_j b_j$ 
+      \Else
+        \State $L \gets \floor{ -M_i - N_i }$
+        \State $U \gets \ceil{M_i - N_i}$
+        \For{$x_i$ from $L$ to $U$}
+          \State $w \gets \operatorname{SVP Enumeration Step} \nbrack{ \mathcal{B}, D+1, \cbrack{x_n, \dots, x_i}, v}$
+          \If{$||w||^2 < ||v||^2$ and $w \neq 0$}
+            \State $v \gets w$
+          \EndIf
+        \EndFor
+        \State \Return $v$
+      \EndIf
+    \end{algorithmic}
+  \end{algorithm}
+
+  \begin{algorithm}
+    \caption{SVP Enumeration}
+    \label{alg:svp}
+    \textbf{Input:} $\mathcal{B}$ a basis of the lattice $\Lambda$. \\
+    \textbf{Output:} $v \in \Lambda$ the shortest non-zero vector. \\
+    \begin{algorithmic}[1]
+      \State $v \gets b_n$
+      \For{$x_n$ from $0$ to $\sqrt{ ||v||^2 / B_n }$ }
+        \State $w \gets \operatorname{SVP Enumeration Step} \nbrack{ \mathcal{B}, D=1, \cbrack{x_n}, v }$
+        \If{$||w||^2 < ||v||^2$ and $w \neq 0$}
+          \State $v \gets w$
+        \EndIf
+      \EndFor
+    \end{algorithmic}
+  \end{algorithm}
+
+
+
+\section{Closest Vector Problem}
+
+  \begin{problem}[Shortest Vector Problem]
+    \label{pb:cvp}
+    Let $\Lambda \subset \M{R}^n$ be a lattice and $w \in \M{R}^n$. We want to find the point $v \in \Lambda$ such that $||w-v||^2$ is minimal.
+  \end{problem}
+
+
+\subsection{Enumeration Method}
+
+  Similarly to the enumeration method for the shortest vector problem as described in \cref{sec:svp-enum}, we will find some bounds on $x_i$ and then enumerate all these until we find a closest vector.
+  We will further use the same notation as earlier, and mostly the same methods to find these bounds as in \cref{sec:svp-enum}.
+
+  So we take some $w \in \M{R}^n$ and we are looking for vectors $v \in \Lambda$ such that $||w - v||^2 \leq A$ for some $A$.
+  We write
+  
+  \begin{align}
+    w &= \sum_{i=1}^{n} y_i b_i^*, \\
+    v &= \sum_{i=1}^{n} z_i b_i^* = \sum_{i=1}^{n} x_i b_i,
+  \end{align}
+
+  we so note that we may write
+
+  \begin{equation}
+    ||v - w||^2 = \llbrack{ \sum_{i=1}^{n} (z_i - y_i)^2 b_i^* }^2
+    = \sum_{i=1}^{n} (z_i - y_i)^2 B_i \leq A.
+  \end{equation}
+
+  From this and the previous discussion, we have the following.
+
+  \begin{theorem}
+    Let $w \in \M{R}^n$ and $v\in \Lambda \subset \M{R}^n$ a lattice point such that $\llbrack{ v - w }^2 \leq A$, then
+
+    \begin{equation}
+      y_i - M_i - N_i \leq x_i \leq y_i + M_i - N_i
+    \end{equation}
+
+    where we have
+
+    \begin{equation}
+      M_i = \sqrt{ \nbrack{ A - \sum_{j=i+1}^{n} \nbrack{ z_j - y_j }^2 B_j } / B_i }, \quad N_i = \sum_{j=i+1}^{n} \mu_{j,i} x_j.
+    \end{equation}
+  \end{theorem}
+
+  The implementation is essentially the same as \cref{alg:svp}, and will therefore not be discussed here.
+  The only real difference is how the bounds are found and the criteria of what we deem to be a wanted vector.
+  If curious it is possible to find these implementations in the appendix.
+
+
+\subsection{Babai's Nearest Plane Method}
+
+\subsubsection{Theory}
+
+  We now consider another method.
+  In contrast to the previous methods, this will not necessarily find the closest vector.
+  The method will however give a good guess if the basis is LLL-reduced, as will be discussed later.
+  In the following discussion we will denote the sublattice generated of $\cbrack{ b_1, \dots, b_i }$ as $\Lambda_i$ and the subspace spanned by the same set $U_i$.
+
+  The main idea with this method is taking the sublattice $\Lambda_{n-1}$, and then finding $l_n \in \Lambda$ such that the distance from $w$ to $U_{n-1} + l_n$ is minimal.
+  This is rather easily done by taking $l_n = \round{y_n} b_n \in \Lambda$, since we know that the last coordinate in the Gram-Schmidt basis is the same as in the original basis.
+  Now we take $w'$ to be the orthogonal projection of $w$ onto $U_{n-1} + l_{n}$, and say $w'' = w' - l_n \in U_{n-1}$. 
+  We now solve the new closest vector problem of $w''$ in $\Lambda_{n-1}$ inductively.
+  We then get some $l_{n-1} \in \Lambda_{n-1}$, and the solution to our original problem will then be $v = l_n + l_{n-1}$.
+  
+
+\subsubsection{Implementation}
+
+  The previous discussion leads us to \cref{alg:babai-nearest-plane}.
+  This algorithm is much easier to analyze.
+  We note that the first for loop loops exactly $n$ times, and inside we do only combinations of addition, multiplication and division.
+  Since all of these are done without any other recursing operations, we can look at the worst costing operation, which is floating point division.
+  This operation we can for all intents and purposes assume is $\O (1)$, as we are working with small numbers.
+  Thus we have a $\O (n)$ time complexity algorithm.
+
+
+  \begin{algorithm}
+    \caption{Babai's Nearest Plane}
+    \label{alg:babai-nearest-plane}
+    \textbf{Input:} $\mathcal{B}$ a basis of the lattice $\Lambda$, $v \in \M{R}^n$. \\
+    \textbf{Output:} $y \in \Lambda$ a vector close to $v$. \\
+    \begin{algorithmic}[1]
+      \State $w \gets v$
+      \State $y \gets 0$
+      \For{$i$ from $n$ downto $1$}
+        \State $l_i \gets \abrack{w, b_i^*}/B_i$
+        \State $y \gets y + \round{l_i} b_i$
+        \State $w \gets w - \nbrack{ l_i - \round{l_i} }b_i^* - b_i \round{l_i}$
+      \EndFor \\
+      \Return y
+    \end{algorithmic}
+  \end{algorithm}
+
+
+\section{LLL-Reduction}
+
+\subsection{Implementation}
+
+  \begin{definition}[$\delta$-LLL-reduced]
+    Let $\Lambda$ be a lattice, and $\mathcal{B} = \cbrack{ b_1, \dots, b_n}$ a basis of $\Lambda$.
+    Using the previous notation and let $\delta \in (1/4, 1)$.
+    Then we say that $\mathcal{B}$ is $\delta$-LLL-reduced if
+    \begin{align}
+      \linebrack{ \mu_{i,j} } &\leq \frac{1}{2}  \quad  \text{for all } 1 \leq j < i \leq n,  \\
+      \delta \llbrack{ b_{i-1}^* }^2 &\leq \llbrack{ b_i^* }^2 + \mu_{i,i-1}^2 \llbrack{ b_{i-1}^* }^2 \quad \text{for all } 2 \leq i \leq n.
+    \end{align}
+  \end{definition}
+
+  \begin{algorithm}
+    \caption{LLL-Reduction}
+    \label{alg:lll-reduction}
+    \textbf{Input:} $\mathcal{B}$ a basis of the lattice $\Lambda$, $\delta \in (1/4, 1)$. \\
+    \textbf{Output:} $\mathcal{B}$ modified to be a $\delta$-LLL-reduced basis for $\Lambda$. \\
+    \begin{algorithmic}[1]
+      \State $k \gets 2$
+      \While{$k \leq n$}
+        \For{$j$ from $k-1$ downto $1$}
+          \If{$\linebrack{\mu_{k,j}} > 1/2$}
+            \State $b_k = b_k - b_j \round{\mu_{k,j}}$
+          \EndIf        
+        \EndFor
+        \If{$B_k > \nbrack{ \delta - \mu_{k, k-1}^2 } B_{k-1}$ }
+          \State $k \gets k+1$
+        \Else
+          \State Swap $b_k$ and $b_{k-1}$
+          \State $k \gets \operatorname{max} \nbrack{ k-1, 2 }$
+        \EndIf
+      \EndWhile
+    \end{algorithmic}
+  \end{algorithm}
+
+  We then end up with \cref{alg:lll-reduction}.
+  I will not go into details on why this works, mainly because of time constraints.
+  We can however do a very fast time complexity analysis.
+  Note that for each loop, we only decrement $k$ if we do a swap.
+  In fact the number of iterations of the while loop is $\O \nbrack{n + 2Z}$ where $Z$ is the amount of swaps.
+  Every operation in the algorithm is also negligible, as we are doing small number arithmetic.
+  So we are only concerned with the amount of swaps done.
+  This number can be shown to be $\O \nbrack{ n^2 \log X }$ where $X \geq \llbrack{ b_i }^2$ for all $1\leq i \leq n$ (\cite{galbraith}).
+  
+
+\subsection{Discussion}
+
+  \begin{table}
+    \begin{center}
+      \begin{tabular}[c]{l|l}
+        \hline
+        Host & 82A2 Lenovo Yoga Slim 7 (14ARE05) \\
+        CPU & AMD Ryzen 7 4700U with Radeon Graphics (8) @ 2.000GHz \\        
+        Memory & 16GB \\
+        Operating system & Arch Linux x86\_64 \\
+        Kernel & 6.13.5-arch1-1 \\
+        \hline
+      \end{tabular}
+    \end{center}
+    \caption{Laptop specifications}\label{tab:specs}
+  \end{table}
+
+  The following discussion will have some results computed on a laptop matching the spcifications in \cref{tab:specs}.
+  The building tool used was \mintinline{sh}{cargo 1.84.1 (66221abde 2024-11-19)}.
+
+  First we will look at the shortest vector problem.
+  Looking at \cref{fig:svp-length}, we can notice that the shortest LLL-reduced basis vector is not that much larger than the shortest vector.
+  This will make the initial guess of shortest vector better, and then enumeration bounds tighter, which again gives us less iterations.
+  This is shown in \cref{fig:enum-lll}, where you can see that LLL-reduction improves the runtime.
+  This reduction seem quite significant as well.
+
+  We can now take a look at Baibai's nearest plane method again, and I claim that LLL-reducing your basis will improve the guess you get from Baibai's nearest plane method.
+  In fact it can by shown that if the basis is LLL-reduced, then if $\Lambda$ is a lattice of full rank $n$, $w\in \M{R}^n$ is the vector we want to get close to and $v\in \Lambda$ is the result of Baibai's nearest plane method.
+  Then for all $u \in \Lambda$
+
+  \begin{equation}
+    \llbrack{ v - w } < 2^{n/2} \llbrack{ u - w }.
+    \label{eq:babai}
+  \end{equation}
+
+  As one can see in \cref{fig:distances}, Babai's method is generally better after doing LLL-reduction.
+  In the simulations for this figure it was only taken one random lattice per $n = 7, \dots, 20$, and then one random vector.
+  We can note that LLL-reduction does not necessarily give a better estimate, as there are points showing the contrary.
+  In fact there are some large differences at the end of our graph where we can see that LLL-reduction in fact did not improve the estimated closest vector.
+  So there are randomness in play, but one can still see these patterns.
+  Still because of the result in \eqref{eq:babai}, one can guarantee a close estimate, something you cannot necessarily do else.
+
+  Furthermore one might wonder if LLL-reduction improves the time of solving the closest vector problem by enumeration.
+  These times are also shown in \cref{fig:enum-lll}.
+  This patterns tends to a difference in running time, and one may extrapolate and assume that this will continue.
+  The difference is not very big, but it might continue on for larger dimensions.
+  We can also note that finding a shortest vector without LLL-reducing is approximately as hard as finding a closest vector.
+  However after a basis reduction, we can note a significant difference in the running time of these two problems.
+  
+
+  \begin{figure}
+    \begin{center}
+      \includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{images/svp-length.svg}
+    \end{center}
+    \caption{Comparison of the shortest vector and the shortest basis vector after LLL-reduction.}\label{fig:svp-length}
+  \end{figure}
+
+  \begin{figure}
+    \begin{center}
+      \includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{images/cvp-distance.svg}
+    \end{center}
+    \caption{Comparison of distances found with Babai's nearest plane method before and after LLL-reduction and against the actual closest vector.}\label{fig:distances}
+  \end{figure}
+
+  \begin{figure}
+    \begin{center}
+      \includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{images/enumeration-lll.svg}
+    \end{center}
+    \caption{Comparison of time taken for enumeration methods before and after LLL-reduction.}\label{fig:enum-lll}
+  \end{figure}
